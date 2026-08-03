@@ -147,7 +147,7 @@ the rest of the API.
 
 ## Providers
 
-Two adapter types cover effectively everything:
+Four adapter types cover effectively everything:
 
 - `type: openai` — OpenAI, DeepSeek, Qwen, Mistral, Groq, OpenRouter, and
   all local engines (Ollama, vLLM, LM Studio, llama.cpp server). Requests
@@ -155,10 +155,41 @@ Two adapter types cover effectively everything:
   calling work end to end.
 - `type: anthropic` — full translation to the Anthropic Messages API,
   including streaming. (Tool-call translation is not implemented yet.)
+- `type: claude-code` — your paid Claude subscription, via the logged-in
+  `claude` CLI on this machine.
+- `type: codex-cli` — your paid ChatGPT subscription, via the logged-in
+  `codex` CLI.
 
 API keys are referenced via `api_key_env` (or `${VAR}` in `api_key`) and
 never appear in logs or API responses. The server refuses to listen beyond
 loopback unless client `api_keys` are configured.
+
+### Your subscription as a provider
+
+The last two types need no `base_url` and no key: Prism runs the CLI's
+official headless mode once per request and translates its JSONL events into
+OpenAI chat completions. Billing is your flat-rate plan, so leave `cost` at
+zero — which makes these the natural target for a `budget_exceeded` rule.
+
+```yaml
+  - name: claude-subscription
+    type: claude-code
+    # command: [/home/you/.local/bin/claude]   # if it is not on the PATH
+    models:
+      - id: sonnet                             # sonnet | opus | haiku | full name
+        aliases: [claude-sub]
+        context_window: 200000
+
+routing:
+  rules:
+    - if: {budget_exceeded: true}              # spend the subscription, not more API credit
+      then: claude-sub
+```
+
+It is a chat bridge, not an API replacement: images and tool definitions are
+rejected with a 400, and answers carry the CLI's agentic framing. Full
+details, including the flags Prism passes and the environment it removes, are
+in [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md#use-your-subscription-as-a-provider).
 
 ## Docs
 

@@ -59,6 +59,39 @@ providers:
         speed: medium
         cost: {input_per_mtok: 0.27, output_per_mtok: 1.10}
 
+  # Subscription CLIs. If you pay for Claude Pro/Max or a ChatGPT plan, the
+  # logged-in CLI on this machine is already a model endpoint — Prism shells
+  # out to its headless mode instead of billing an API key. Costs stay at the
+  # default of zero, which is what makes these the natural target for the
+  # budget_exceeded rule below. Requires the CLI installed and logged in
+  # (`claude` / `codex`); add `command:` if it is not on the PATH the gateway
+  # sees. Chat only: no images and no tool calls (both are rejected with 400).
+  #
+  # - name: claude-subscription
+  #   type: claude-code
+  #   # command: [/home/you/.local/bin/claude]
+  #   models:
+  #     - id: sonnet
+  #       aliases: [claude-sub]
+  #       context_window: 200000
+  #       capabilities: [code, reasoning]
+  #       speed: fast
+  #     - id: opus
+  #       aliases: [opus-sub]
+  #       context_window: 200000
+  #       capabilities: [code, reasoning]
+  #       speed: medium
+  #
+  # - name: codex-subscription
+  #   type: codex-cli
+  #   # command: [/home/you/.local/bin/codex]
+  #   models:
+  #     - id: gpt-5.1-codex
+  #       aliases: [codex-sub]
+  #       context_window: 400000
+  #       capabilities: [code, reasoning]
+  #       speed: medium
+
   # Any OpenAI-compatible local engine works the same way:
   # Ollama, vLLM, LM Studio, llama.cpp server...
   - name: ollama
@@ -90,6 +123,12 @@ routing:
       then: claude-sonnet
     - if: {offline: true}
       then: local:any
+    # The subscription-as-overflow-valve pattern: once the month's API budget
+    # is spent, keep answering at full quality on the flat-rate plan you have
+    # already paid for instead of falling back to a local model. Uncomment the
+    # claude-subscription provider above to use it.
+    # - if: {budget_exceeded: true}
+    #   then: claude-sub
     - if: {budget_exceeded: true}
       then: local:any
     - if: {task: code}

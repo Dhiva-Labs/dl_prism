@@ -98,6 +98,138 @@ export OPENAI_API_KEY=dummy
 codex --model auto
 ```
 
+---
+
+## Use your subscription as a provider
+
+Everything above points a client *at* Prism. This points Prism *at* a CLI.
+
+If you already pay for Claude Pro/Max or a ChatGPT plan, the logged-in CLI on
+your machine is a model endpoint you have bought and are probably
+under-using. Prism can route to it like any other provider: it runs the CLI's
+official headless mode once per request and translates the JSONL events it
+prints into OpenAI chat completions. Nothing is billed per token — the calls
+come out of your plan.
+
+```yaml
+providers:
+  - name: claude-subscription
+    type: claude-code
+    models:
+      - id: sonnet                 # sonnet | opus | haiku, or a full model name
+        aliases: [claude-sub]
+        context_window: 200000
+        capabilities: [code, reasoning]
+
+  - name: codex-subscription
+    type: codex-cli
+    models:
+      - id: gpt-5.1-codex
+        aliases: [codex-sub]
+        context_window: 400000
+```
+
+Neither type takes a `base_url` or a key — the CLI owns its endpoint and its
+credentials — and both are rejected if you set one. Requirements: the CLI is
+installed and already logged in (`claude` / `codex`, verify with a manual
+`claude -p hi`). If it is not on the `PATH` the gateway process sees, name it:
+
+```yaml
+    command: [/home/you/.local/bin/claude]     # or [npx, "@anthropic-ai/claude-code"]
+```
+
+### The overflow-valve pattern
+
+Leave `cost` at its default of zero, because a subscription is flat-rate.
+That makes these providers the obvious place for spend to go when the
+metered budget runs out:
+
+```yaml
+budget:
+  monthly_usd: 50
+
+routing:
+  rules:
+    - if: {budget_exceeded: true}
+      then: claude-sub
+```
+
+Instead of dropping to a local 8B model for the rest of the month, the
+gateway keeps answering on the plan you already pay for. The same works as a
+failover chain entry:
+
+```yaml
+  fallbacks:
+    claude-sonnet: [claude-sub, gpt-5, qwen-coder]
+```
+
+### What Prism runs
+
+Per request, in an empty temporary directory, with no stdin:
+
+```bash
+claude --tools "" --print --output-format stream-json --verbose \
+       --model <id> --safe-mode --max-turns 1 \
+       [--include-partial-messages] -- <prompt>
+
+codex exec --json --skip-git-repo-check --model <id> \
+       --sandbox read-only -- <prompt>
+```
+
+The optional flags are feature-detected from the CLI's own `--help` once per
+binary and dropped if your version does not have them, so an older install
+still works — it just loses that hardening. `--tools ""` and `--sandbox
+read-only` are what keep the CLI to chat: no file access, no shell, no web.
+`--safe-mode` stops your `CLAUDE.md`, skills, plugins, hooks and MCP servers
+from shaping a gateway request. Everything after `--` is the prompt, so a
+prompt starting with a dash can never be read as a flag.
+
+Prism also removes `ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL` and the matching
+API-key and model variables from the child's environment. If you followed the
+sections above, those point at Prism — inherited, the gateway would call a
+CLI that calls the gateway, forever. Dropping the keys is deliberate too:
+these types exist to spend a subscription, and the `API_KEY=dummy` that setup
+asks for would otherwise fail the CLI's own auth. For API-key billing use
+`type: anthropic` or `type: openai` instead.
+
+### How your messages are flattened
+
+A CLI takes one prompt string, not a message list, so Prism renders the
+conversation:
+
+```
+System: <every system and developer message, blank-line joined>
+
+User: <text>
+
+Assistant: <text>
+
+User: <text>
+```
+
+One exception: a single user message with no system prompt is passed through
+verbatim, so an ordinary one-shot completion reaches the CLI exactly as you
+wrote it.
+
+### Limits
+
+- **No images and no tool calls.** Both are rejected with a 400, the same
+  limitation the outbound `anthropic` adapter has. Route vision and
+  tool-calling traffic to an API-type provider.
+- **It answers as the CLI.** The CLI's own system prompt is in the context,
+  so replies may carry its agentic framing and its prompt overhead shows up
+  in your token counts. This is a chat bridge, not an API replacement.
+- **Streaming is real only where the CLI supports it.** With
+  `--include-partial-messages` (Claude Code) you get token-by-token deltas.
+  Codex has no partial mode, so its answer arrives as a single chunk followed
+  by `[DONE]` — with the upside that a streaming request keeps full failover,
+  because nothing is written until the CLI has succeeded.
+- **Latency is CLI latency.** Process spawn plus the CLI's own startup sits
+  in front of every request. There is no timeout beyond the client's.
+- **Rate limits are plan limits.** When the plan's window is exhausted the
+  CLI exits with an error; Prism reports that as a retryable upstream failure
+  and fails over to the next candidate in the chain.
+
 ## Cursor
 
 Settings → Models → *Override OpenAI Base URL*:

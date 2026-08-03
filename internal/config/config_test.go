@@ -188,6 +188,64 @@ providers:
 			wantErr: "unknown type",
 		},
 		{
+			name: "http type without base_url",
+			yaml: `
+providers:
+  - name: test
+    type: anthropic
+    models:
+      - id: model-1
+`,
+			wantErr: "base_url must start with",
+		},
+		{
+			name: "command on an http type",
+			yaml: `
+providers:
+  - name: test
+    type: openai
+    base_url: https://api.test.com
+    command: [claude]
+    models:
+      - id: model-1
+`,
+			wantErr: "command is only valid for the claude-code and codex-cli types",
+		},
+		{
+			name: "base_url on a cli type",
+			yaml: `
+providers:
+  - name: claude-sub
+    type: claude-code
+    base_url: https://api.anthropic.com
+    models:
+      - id: sonnet
+`,
+			wantErr: `base_url is not used by type "claude-code"`,
+		},
+		{
+			name: "empty command entry",
+			yaml: `
+providers:
+  - name: codex-sub
+    type: codex-cli
+    command: ["codex", ""]
+    models:
+      - id: gpt-5
+`,
+			wantErr: "command[1] is empty",
+		},
+		{
+			name: "cli type with no models",
+			yaml: `
+providers:
+  - name: claude-sub
+    type: claude-code
+    models: []
+`,
+			wantErr: "declares no models",
+		},
+		{
 			name: "bad base_url",
 			yaml: `
 providers:
@@ -282,6 +340,62 @@ providers:
 `
 	if _, err := Parse([]byte(yaml)); err != nil {
 		t.Errorf("Parse() error = %v, want nil for loopback listener without api_keys", err)
+	}
+}
+
+// Subscription-CLI providers carry no endpoint and no key: the installed,
+// logged-in CLI owns both.
+func TestParseCLIProviders(t *testing.T) {
+	yaml := `
+providers:
+  - name: claude-sub
+    type: claude-code
+    models:
+      - id: sonnet
+        aliases: [claude-subscription]
+        context_window: 200000
+        capabilities: [code, reasoning]
+        speed: fast
+  - name: codex-sub
+    type: codex-cli
+    command: [/opt/codex/bin/codex]
+    models:
+      - id: gpt-5.1-codex
+        context_window: 400000
+routing:
+  rules:
+    - if: {budget_exceeded: true}
+      then: claude-subscription
+`
+	cfg, err := Parse([]byte(yaml))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	claude, codex := &cfg.Providers[0], &cfg.Providers[1]
+	if !claude.IsCLI() || !codex.IsCLI() {
+		t.Errorf("IsCLI() = %v/%v, want both true", claude.IsCLI(), codex.IsCLI())
+	}
+	if len(claude.Command) != 0 {
+		t.Errorf("claude-sub Command = %q, want empty so the adapter's default applies", claude.Command)
+	}
+	if got := codex.Command; len(got) != 1 || got[0] != "/opt/codex/bin/codex" {
+		t.Errorf("codex-sub Command = %q, want the override", got)
+	}
+	// Cost defaults to zero: a subscription is flat-rate.
+	if c := claude.Models[0].Cost; c.InputPerMTok != 0 || c.OutputPerMTok != 0 {
+		t.Errorf("Cost = %+v, want zero", c)
+	}
+}
+
+func TestIsCLI(t *testing.T) {
+	for typ, want := range map[string]bool{
+		TypeOpenAI: false, TypeAnthropic: false,
+		TypeClaudeCode: true, TypeCodexCLI: true,
+	} {
+		p := Provider{Type: typ}
+		if got := p.IsCLI(); got != want {
+			t.Errorf("Provider{Type: %q}.IsCLI() = %v, want %v", typ, got, want)
+		}
 	}
 }
 

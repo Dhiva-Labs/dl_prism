@@ -29,9 +29,21 @@ type Server struct {
 	APIKeys []string `yaml:"api_keys"`
 }
 
+// Provider types. The first two speak HTTP to a remote endpoint and need a
+// base_url; the last two shell out to a locally installed, already-logged-in
+// vendor CLI and need none.
+const (
+	TypeOpenAI     = "openai"
+	TypeAnthropic  = "anthropic"
+	TypeClaudeCode = "claude-code"
+	TypeCodexCLI   = "codex-cli"
+)
+
 type Provider struct {
-	Name    string `yaml:"name"`
-	Type    string `yaml:"type"` // "openai" (any OpenAI-compatible API) or "anthropic"
+	Name string `yaml:"name"`
+	// Type is one of the Type* constants above.
+	Type string `yaml:"type"`
+	// BaseURL is required for the HTTP types and rejected for the CLI ones.
 	BaseURL string `yaml:"base_url"`
 	// APIKey may embed ${ENV_VAR} references; APIKeyEnv names a variable
 	// to read directly. Keys never appear in logs or API responses.
@@ -39,7 +51,18 @@ type Provider struct {
 	APIKeyEnv string            `yaml:"api_key_env"`
 	Headers   map[string]string `yaml:"headers"`
 	Local     bool              `yaml:"local"`
-	Models    []Model           `yaml:"models"`
+	// Command overrides the executable (and any leading arguments) used by
+	// the CLI types, for CLIs that are not on the gateway's PATH — e.g.
+	// ["/opt/claude/bin/claude"] or ["npx", "@anthropic-ai/claude-code"].
+	// Defaults to ["claude"] / ["codex"]. Rejected for the HTTP types.
+	Command []string `yaml:"command"`
+	Models  []Model  `yaml:"models"`
+}
+
+// IsCLI reports whether this provider drives a local subscription CLI
+// instead of an HTTP endpoint.
+func (p *Provider) IsCLI() bool {
+	return p.Type == TypeClaudeCode || p.Type == TypeCodexCLI
 }
 
 // Key resolves the API key for this provider, or "" for keyless (local) endpoints.
@@ -163,11 +186,29 @@ func (c *Config) validate() error {
 			return fmt.Errorf("config: duplicate provider name %q", p.Name)
 		}
 		seen[p.Name] = true
-		if p.Type != "openai" && p.Type != "anthropic" {
-			return fmt.Errorf("config: provider %q: unknown type %q (want openai or anthropic)", p.Name, p.Type)
-		}
-		if !strings.HasPrefix(p.BaseURL, "http://") && !strings.HasPrefix(p.BaseURL, "https://") {
-			return fmt.Errorf("config: provider %q: base_url must start with http:// or https://", p.Name)
+		switch p.Type {
+		case TypeOpenAI, TypeAnthropic:
+			if !strings.HasPrefix(p.BaseURL, "http://") && !strings.HasPrefix(p.BaseURL, "https://") {
+				return fmt.Errorf("config: provider %q: base_url must start with http:// or https://", p.Name)
+			}
+			if len(p.Command) > 0 {
+				return fmt.Errorf("config: provider %q: command is only valid for the %s and %s types",
+					p.Name, TypeClaudeCode, TypeCodexCLI)
+			}
+		case TypeClaudeCode, TypeCodexCLI:
+			// The CLI carries its own endpoint and its own logged-in
+			// credentials; a base_url here would be silently ignored.
+			if p.BaseURL != "" {
+				return fmt.Errorf("config: provider %q: base_url is not used by type %q (the CLI owns its endpoint)", p.Name, p.Type)
+			}
+			for j, arg := range p.Command {
+				if arg == "" {
+					return fmt.Errorf("config: provider %q: command[%d] is empty", p.Name, j)
+				}
+			}
+		default:
+			return fmt.Errorf("config: provider %q: unknown type %q (want %s, %s, %s or %s)",
+				p.Name, p.Type, TypeOpenAI, TypeAnthropic, TypeClaudeCode, TypeCodexCLI)
 		}
 		if len(p.Models) == 0 {
 			return fmt.Errorf("config: provider %q declares no models", p.Name)

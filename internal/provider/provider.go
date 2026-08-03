@@ -114,10 +114,14 @@ type Adapter interface {
 // ForType returns the adapter for a validated provider type.
 func ForType(t string) (Adapter, error) {
 	switch t {
-	case "openai":
+	case config.TypeOpenAI:
 		return &OpenAI{}, nil
-	case "anthropic":
+	case config.TypeAnthropic:
 		return &Anthropic{}, nil
+	case config.TypeClaudeCode:
+		return &ClaudeCode{}, nil
+	case config.TypeCodexCLI:
+		return &CodexCLI{}, nil
 	}
 	return nil, fmt.Errorf("no adapter for provider type %q", t)
 }
