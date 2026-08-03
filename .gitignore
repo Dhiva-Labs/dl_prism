@@ -1,0 +1,5 @@
+/prism
+/bin/
+/dist/
+prism.yaml
+*.test

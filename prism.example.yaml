@@ -1,0 +1,104 @@
+# DL Prism example configuration.
+# Copy to ./prism.yaml or ~/.config/prism/prism.yaml and edit.
+
+server:
+  listen: 127.0.0.1:8130
+  # Bearer tokens clients must send. Required if you listen beyond loopback.
+  api_keys: []
+
+providers:
+  - name: anthropic
+    type: anthropic
+    base_url: https://api.anthropic.com
+    api_key_env: ANTHROPIC_API_KEY
+    models:
+      - id: claude-sonnet-4-5
+        aliases: [claude-sonnet]
+        context_window: 200000
+        capabilities: [code, reasoning, vision, tools]
+        speed: fast
+        cost: {input_per_mtok: 3.00, output_per_mtok: 15.00}
+
+  - name: openai
+    type: openai
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    models:
+      - id: gpt-5
+        context_window: 400000
+        capabilities: [code, reasoning, vision, tools]
+        speed: medium
+        cost: {input_per_mtok: 1.25, output_per_mtok: 10.00}
+      - id: gpt-5-mini
+        context_window: 400000
+        capabilities: [code, reasoning, vision, tools]
+        speed: fast
+        cost: {input_per_mtok: 0.25, output_per_mtok: 2.00}
+
+  - name: moonshot
+    type: openai
+    base_url: https://api.moonshot.ai/v1
+    api_key_env: MOONSHOT_API_KEY
+    models:
+      - id: kimi-k2-0905-preview
+        aliases: [kimi, kimi-k2]
+        context_window: 262144
+        capabilities: [code, reasoning, tools]
+        speed: medium
+        cost: {input_per_mtok: 0.60, output_per_mtok: 2.50}
+
+  - name: deepseek
+    type: openai
+    base_url: https://api.deepseek.com/v1
+    api_key_env: DEEPSEEK_API_KEY
+    models:
+      - id: deepseek-chat
+        aliases: [deepseek]
+        context_window: 128000
+        capabilities: [code, reasoning, tools]
+        speed: medium
+        cost: {input_per_mtok: 0.27, output_per_mtok: 1.10}
+
+  # Any OpenAI-compatible local engine works the same way:
+  # Ollama, vLLM, LM Studio, llama.cpp server...
+  - name: ollama
+    type: openai
+    base_url: http://127.0.0.1:11434/v1
+    local: true
+    models:
+      - id: qwen2.5-coder:14b
+        aliases: [qwen-coder]
+        context_window: 32768
+        capabilities: [code]
+        speed: fast
+      - id: llama3.1:8b
+        aliases: [llama3]
+        context_window: 128000
+        capabilities: [reasoning]
+        speed: fast
+
+routing:
+  # Used in automatic mode when no rule below matches.
+  default: claude-sonnet
+  # First full match wins. An empty `if:` is a catch-all.
+  rules:
+    - if: {language: python}
+      then: qwen-coder
+    - if: {task: security}
+      then: claude-sonnet
+    - if: {task: vision}
+      then: claude-sonnet
+    - if: {offline: true}
+      then: local:any
+    - if: {budget_exceeded: true}
+      then: local:any
+    - if: {task: code}
+      then: qwen-coder
+  # Ordered failover chains, tried when a provider errors.
+  fallbacks:
+    claude-sonnet: [gpt-5, deepseek, qwen-coder]
+    gpt-5: [claude-sonnet, deepseek]
+    qwen-coder: [deepseek, claude-sonnet]
+
+budget:
+  monthly_usd: 50

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="description" content="DL Prism — local-first AI gateway dashboard" />
+    <title>DL Prism</title>
+    <script>
+      // Applied before first paint so the theme never flashes.
+      (function () {
+        try {
+          var stored = localStorage.getItem('dlprism.theme');
+          var theme =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : window.matchMedia('(prefers-color-scheme: light)').matches
+                ? 'light'
+                : 'dark';
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="./assets/index-BSys44N8.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BEMEfQ1J.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
