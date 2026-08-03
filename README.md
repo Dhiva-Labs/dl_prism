@@ -1,5 +1,10 @@
 # DL Prism
 
+<p align="center">
+  <img src="docs/design/spectral-discipline-plate-i.png" alt="PLATE I — one beam dispersed into a labeled spectrum of AI providers" width="560">
+</p>
+<p align="center"><em>one beam in — the whole spectrum out</em></p>
+
 A local-first AI gateway. One OpenAI-compatible endpoint in front of every
 model you use — cloud or local — with manual and automatic routing, policy
 rules, failover, and budget-aware cost tracking. Single static Go binary.

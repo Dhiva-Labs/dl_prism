@@ -1,5 +1,6 @@
 import { CopyButton } from '../CopyButton'
 import { formatNumber } from '../../lib/format'
+import { spectralIndex } from '../../lib/spectral'
 import { IconAlert } from '../Icons'
 import type { RouteInfo } from '../../lib/types'
 import type { Turn } from './types'
@@ -16,6 +17,9 @@ function RouteBar({ route }: { route: RouteInfo }) {
     <div className="route">
       {items.map(([key, value]) => (
         <span className="route__item" key={key}>
+          {key === 'provider' ? (
+            <span className={`route__dot spectral-${spectralIndex(value)}`} aria-hidden />
+          ) : null}
           <span className="route__key">{key}</span>
           <span className="route__val">{value}</span>
         </span>

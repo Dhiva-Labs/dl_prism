@@ -68,7 +68,7 @@ function Sidebar() {
       </div>
 
       <div className="sidebar__footer">
-        <span className="sidebar__version">gateway dashboard</span>
+        <span className="sidebar__version">one beam in — every model out</span>
         <ThemeToggle />
       </div>
     </nav>

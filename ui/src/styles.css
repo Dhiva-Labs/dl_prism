@@ -76,6 +76,16 @@
   --shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.6);
   --scrim: rgba(0, 0, 0, 0.6);
+
+  /* Spectral Discipline calibration bands (docs/design/PHILOSOPHY.md):
+     providers are wavelengths of the one dispersed beam. */
+  --spectral-1: #e5484d;
+  --spectral-2: #f76b15;
+  --spectral-3: #ffc53d;
+  --spectral-4: #46a758;
+  --spectral-5: #00a2c7;
+  --spectral-6: #3e63dd;
+  --spectral-7: #8e4ec6;
 }
 
 /* ---- light ------------------------------------------------------------- */
@@ -111,6 +121,15 @@
   --shadow: 0 4px 16px rgba(16, 16, 24, 0.09);
   --shadow-lg: 0 16px 48px rgba(16, 16, 24, 0.16);
   --scrim: rgba(16, 16, 24, 0.34);
+
+  /* Spectral bands, darkened for light-field contrast. */
+  --spectral-1: #ce2c31;
+  --spectral-2: #cc4e00;
+  --spectral-3: #9e6c00;
+  --spectral-4: #2a7e3b;
+  --spectral-5: #107d98;
+  --spectral-6: #3451b2;
+  --spectral-7: #793aaf;
 }
 
 /* ==========================================================================
@@ -1066,6 +1085,21 @@ a {
   font-size: var(--fs-sm);
   color: var(--text);
 }
+
+/* Provider chips carry their spectral band — one beam, many wavelengths. */
+.route__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+.spectral-1 { background: var(--spectral-1); }
+.spectral-2 { background: var(--spectral-2); }
+.spectral-3 { background: var(--spectral-3); }
+.spectral-4 { background: var(--spectral-4); }
+.spectral-5 { background: var(--spectral-5); }
+.spectral-6 { background: var(--spectral-6); }
+.spectral-7 { background: var(--spectral-7); }
 
 .route__reason {
   flex: 1 1 100%;
