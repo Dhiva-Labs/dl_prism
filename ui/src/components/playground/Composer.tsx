@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 
 import { estimateTokens } from '../../lib/format'
 import { IconSend, IconStop } from '../Icons'
@@ -10,6 +10,8 @@ export function Composer({
   onStop,
   busy,
   disabled,
+  placeholder,
+  hint,
 }: {
   value: string
   onChange: (next: string) => void
@@ -17,6 +19,10 @@ export function Composer({
   onStop: () => void
   busy: boolean
   disabled: boolean
+  /** Overrides the default idle/disabled placeholders. */
+  placeholder?: string
+  /** Extra line in the footer, left of the token estimate. */
+  hint?: ReactNode
 }) {
   const ref = useRef<HTMLTextAreaElement | null>(null)
 
@@ -45,7 +51,7 @@ export function Composer({
             className="textarea"
             rows={1}
             value={value}
-            placeholder={disabled ? 'Waiting for the model list…' : 'Send a message…'}
+            placeholder={placeholder ?? (disabled ? 'Waiting for the model list…' : 'Send a message…')}
             aria-label="Message"
             disabled={disabled}
             onChange={(e) => onChange(e.target.value)}
@@ -73,6 +79,7 @@ export function Composer({
           <span>
             <kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> for a newline
           </span>
+          {hint}
           {value.trim() ? <span>~{estimateTokens(value)} tokens</span> : null}
         </div>
       </div>

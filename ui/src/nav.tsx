@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import {
   IconModels,
   IconPlayground,
+  IconProjects,
   IconRouting,
   IconStatus,
   IconUsage,
@@ -17,6 +18,12 @@ export interface NavEntry {
 }
 
 export const NAV: NavEntry[] = [
+  {
+    path: '/projects',
+    label: 'Projects',
+    blurb: 'Persistent conversations, project knowledge, and the agent',
+    icon: <IconProjects />,
+  },
   {
     path: '/playground',
     label: 'Playground',

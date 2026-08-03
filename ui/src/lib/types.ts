@@ -156,3 +156,118 @@ export interface RoutingConfig {
   rules: RoutingRule[]
   fallbacks: Record<string, string[]>
 }
+
+/* ===========================================================================
+   Workbench — projects, chats, knowledge, agent runs.
+   Mirrors docs/WORKBENCH_PLAN.md (wave A). The backend lands in parallel, so
+   every optional field here is one the UI renders without.
+   =========================================================================== */
+
+/** Timestamps arrive as RFC3339 or unix seconds depending on the encoder. */
+export type Timestamp = string | number
+
+export type ApprovalMode = 'always' | 'mutations' | 'never'
+
+export interface ProjectSettings {
+  agent_enabled: boolean
+  approval_mode: ApprovalMode
+  /** Empty means "use the gateway default" (the `auto` policy model). */
+  model: string
+  system_prompt: string
+}
+
+export interface Project {
+  id: string
+  name: string
+  created_at?: Timestamp
+  updated_at?: Timestamp
+  /** Server-side count so the card doesn't have to fetch every chat list. */
+  chat_count?: number
+  settings?: Partial<ProjectSettings>
+}
+
+export interface Chat {
+  id: string
+  project_id?: string
+  title?: string
+  created_at?: Timestamp
+  updated_at?: Timestamp
+  message_count?: number
+}
+
+/**
+ * One line of `chats/<id>.jsonl`. Deliberately loose: the persisted event log
+ * and the live SSE stream are the same vocabulary, and the field names for the
+ * persisted user/assistant turns are not nailed down in the plan.
+ */
+export interface ChatEvent {
+  type?: string
+  role?: string
+  /** `text` on stream events, `content` on stored messages — accept both. */
+  text?: string
+  content?: string
+  message?: string
+  id?: string
+  tool_call_id?: string
+  name?: string
+  args?: unknown
+  arguments?: unknown
+  output?: string
+  truncated?: boolean
+  approved?: boolean
+  usage?: Usage
+  created_at?: Timestamp
+}
+
+export interface ChatDetail extends Chat {
+  events?: ChatEvent[]
+  /** Some encoders may prefer a plain message array; both are rendered. */
+  messages?: ChatEvent[]
+}
+
+export interface KnowledgeFile {
+  name: string
+  size?: number
+  /** The gateway sends `modified`; `modified_at` is accepted as a synonym. */
+  modified?: Timestamp
+  modified_at?: Timestamp
+  /** True when the file is small enough to be folded into the system context. */
+  in_context?: boolean
+}
+
+export type AgentEventType =
+  | 'message_delta'
+  | 'tool_call'
+  | 'tool_await_approval'
+  | 'tool_result'
+  | 'done'
+  | 'error'
+
+export interface AgentEvent {
+  type?: AgentEventType | string
+  text?: string
+  id?: string
+  tool_call_id?: string
+  name?: string
+  args?: unknown
+  arguments?: unknown
+  output?: string
+  truncated?: boolean
+  /** False on a tool the user denied. Absent means the call was not gated. */
+  approved?: boolean
+  usage?: Usage
+  message?: string
+  route?: RouteInfo
+}
+
+export interface AgentRunRequest {
+  chat_id: string
+  message: string
+  model?: string
+}
+
+export interface AgentApproveRequest {
+  chat_id: string
+  tool_call_id: string
+  approve: boolean
+}

@@ -125,3 +125,60 @@ export function estimateTokens(text: string): number {
   if (!text) return 0
   return Math.ceil(text.length / 4)
 }
+
+/**
+ * Timestamps from the workbench endpoints are not pinned to one encoding yet,
+ * so accept RFC3339 strings, unix seconds, and unix millis alike.
+ */
+export function parseTime(value: string | number | undefined | null): Date | undefined {
+  if (value === undefined || value === null || value === '') return undefined
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || value <= 0) return undefined
+    return new Date(value > 1e12 ? value : value * 1000)
+  }
+  const trimmed = value.trim()
+  if (/^\d+$/.test(trimmed)) return parseTime(Number(trimmed))
+  const date = new Date(trimmed)
+  return Number.isNaN(date.getTime()) ? undefined : date
+}
+
+/** "updated 4m ago" phrasing for lists that change while you watch them. */
+export function formatRelative(value: string | number | undefined | null): string {
+  const date = parseTime(value)
+  if (!date) return '—'
+  const seconds = Math.round((Date.now() - date.getTime()) / 1000)
+  if (seconds < 0) return 'just now'
+  if (seconds < 45) return 'just now'
+  if (seconds < 3600) return `${Math.max(1, Math.round(seconds / 60))}m ago`
+  if (seconds < 86400) return `${Math.round(seconds / 3600)}h ago`
+  if (seconds < 172800) return 'yesterday'
+  if (seconds < 604800) return `${Math.round(seconds / 86400)}d ago`
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+/** Absolute form for tooltips, where "3d ago" is not enough. */
+export function formatTimestamp(value: string | number | undefined | null): string {
+  const date = parseTime(value)
+  if (!date) return '—'
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+/** Knowledge file sizes: 812 B · 31.4 KB · 1.2 MB. Decimal units, like the OS. */
+export function formatBytes(bytes: number | undefined | null): string {
+  if (bytes === undefined || bytes === null || Number.isNaN(bytes) || bytes < 0) return '—'
+  if (bytes < 1000) return `${bytes} B`
+  const units = ['KB', 'MB', 'GB', 'TB']
+  let value = bytes / 1000
+  let unit = 0
+  while (value >= 1000 && unit < units.length - 1) {
+    value /= 1000
+    unit++
+  }
+  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`
+}

@@ -39,6 +39,11 @@ export class ApiError extends Error {
     return this.status === 401
   }
 
+  /** The gateway refused because the resource is already busy. */
+  get isConflict(): boolean {
+    return this.status === 409
+  }
+
   /** The gateway isn't reachable at all (process down, network dropped). */
   get isOffline(): boolean {
     return this.status === 0
@@ -49,7 +54,7 @@ interface ErrorEnvelope {
   error?: { message?: string; type?: string }
 }
 
-function authHeaders(extra?: Record<string, string>): Headers {
+export function authHeaders(extra?: Record<string, string>): Headers {
   const headers = new Headers(extra)
   const key = getApiKey()
   if (key) headers.set('Authorization', `Bearer ${key}`)
@@ -57,7 +62,7 @@ function authHeaders(extra?: Record<string, string>): Headers {
 }
 
 /** Turn any failure — HTTP, transport, or malformed body — into an ApiError. */
-async function normalizeError(res: Response): Promise<ApiError> {
+export async function normalizeError(res: Response): Promise<ApiError> {
   if (res.status === 401) markUnauthorized()
 
   let message = ''
@@ -80,12 +85,16 @@ async function normalizeError(res: Response): Promise<ApiError> {
   return new ApiError(message, res.status, type)
 }
 
-function transportError(err: unknown): ApiError {
+export function transportError(err: unknown): ApiError {
   const detail = err instanceof Error ? err.message : String(err)
   return new ApiError(`Cannot reach the gateway (${detail})`, 0)
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+/**
+ * One JSON round-trip. Empty bodies (204 on DELETE) resolve to `undefined`
+ * rather than throwing, so callers can type those as `Promise<void>`.
+ */
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response
   try {
     res = await fetch(path, { ...init, headers: authHeaders(init?.headers as Record<string, string>) })
@@ -94,7 +103,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw transportError(err)
   }
   if (!res.ok) throw await normalizeError(res)
-  return (await res.json()) as T
+
+  const body = await res.text()
+  if (!body.trim()) return undefined as T
+  try {
+    return JSON.parse(body) as T
+  } catch {
+    throw new ApiError('The gateway returned a malformed response body', res.status)
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -139,6 +155,41 @@ function readRouteHeaders(res: Response): RouteInfo {
   }
 }
 
+/**
+ * Incremental SSE pump shared by the chat and agent streams. Buffers raw
+ * bytes, splits on the blank-line event delimiter, and hands each raw event
+ * block to `onEvent` as it arrives so the UI paints while the response is
+ * still open. `onEvent` returns true to stop reading.
+ */
+export async function pumpSse(res: Response, onEvent: (raw: string) => boolean): Promise<void> {
+  if (!res.body) throw new ApiError('Streaming is unavailable in this browser', 0)
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n')
+
+      let cut = buffer.indexOf('\n\n')
+      while (cut !== -1) {
+        const event = buffer.slice(0, cut)
+        buffer = buffer.slice(cut + 2)
+        if (onEvent(event)) return
+        cut = buffer.indexOf('\n\n')
+      }
+    }
+    // Flush a trailing event that arrived without its blank-line terminator.
+    buffer += decoder.decode()
+    if (buffer.trim()) onEvent(buffer)
+  } finally {
+    reader.cancel().catch(() => undefined)
+  }
+}
+
 export interface StreamHandlers {
   /** Fired once, as soon as response headers land (before the first token). */
   onRoute?: (route: RouteInfo) => void
@@ -147,9 +198,8 @@ export interface StreamHandlers {
 }
 
 /**
- * Incremental SSE reader. Buffers raw bytes, splits on the blank-line event
- * delimiter, and forwards `data:` payloads as they arrive so tokens render
- * while the response is still open. Terminates on `data: [DONE]`.
+ * Streaming completion. Forwards `data:` payloads as they arrive so tokens
+ * render while the response is still open; terminates on `data: [DONE]`.
  */
 export async function streamChat(
   body: ChatRequest,
@@ -172,12 +222,6 @@ export async function streamChat(
   if (!res.ok) throw await normalizeError(res)
   handlers.onRoute?.(readRouteHeaders(res))
 
-  if (!res.body) throw new ApiError('Streaming is unavailable in this browser', 0)
-
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-
   const handleEvent = (raw: string): boolean => {
     // An SSE event may carry several `data:` lines; the gateway sends one.
     let payload = ''
@@ -199,26 +243,7 @@ export async function streamChat(
     return false
   }
 
-  try {
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-
-      let cut = buffer.indexOf('\n\n')
-      while (cut !== -1) {
-        const event = buffer.slice(0, cut)
-        buffer = buffer.slice(cut + 2)
-        if (handleEvent(event)) return
-        cut = buffer.indexOf('\n\n')
-      }
-    }
-    // Flush a trailing event that arrived without its blank-line terminator.
-    buffer += decoder.decode()
-    if (buffer.trim()) handleEvent(buffer)
-  } finally {
-    reader.cancel().catch(() => undefined)
-  }
+  await pumpSse(res, handleEvent)
 }
 
 export interface ChatResult {

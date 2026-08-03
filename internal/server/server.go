@@ -56,6 +56,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /admin/usage", s.auth(s.handleUsage))
 	mux.HandleFunc("GET /admin/status", s.auth(s.handleStatus))
 	mux.HandleFunc("GET /admin/routing", s.auth(s.handleRouting))
+	s.routeWorkbench(mux)
 	return mux
 }
 

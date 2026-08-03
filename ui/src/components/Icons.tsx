@@ -222,6 +222,90 @@ export function IconInbox({ size = 22, className }: IconProps) {
   )
 }
 
+/** Stacked plates — a project is a pile of related work. */
+export function IconProjects({ size = 16, className }: IconProps) {
+  return (
+    <svg {...svgProps(size, className)}>
+      <path d="M12 3 21 7.5 12 12 3 7.5z" />
+      <path d="M3.4 12 12 16.3 20.6 12" opacity="0.75" />
+      <path d="M3.4 16.4 12 20.7l8.6-4.3" opacity="0.45" />
+    </svg>
+  )
+}
+
+export function IconPencil({ size = 16, className }: IconProps) {
+  return (
+    <svg {...svgProps(size, className)}>
+      <path d="M4 20.2 4.8 16l11-11a2 2 0 0 1 2.9 0l.4.4a2 2 0 0 1 0 2.9l-11 11z" />
+      <path d="M14.4 6.6 17.4 9.6" />
+    </svg>
+  )
+}
+
+export function IconPlus({ size = 16, className }: IconProps) {
+  return (
+    <svg {...svgProps(size, className)}>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  )
+}
+
+export function IconArrowLeft({ size = 14, className }: IconProps) {
+  return (
+    <svg {...svgProps(size, className)}>
+      <path d="M20 12H5M11 6l-6 6 6 6" />
+    </svg>
+  )
+}
+
+/** Sliders — per-project settings. */
+export function IconSettings({ size = 16, className }: IconProps) {
+  return (
+    <svg {...svgProps(size, className)}>
+      <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
+      <circle cx="15" cy="7" r="2.2" />
+      <circle cx="9" cy="17" r="2.2" />
+    </svg>
+  )
+}
+
+/** A tool call: the agent reaching outside the conversation. */
+export function IconTool({ size = 16, className }: IconProps) {
+  return (
+    <svg {...svgProps(size, className)}>
+      <path d="M14.6 4.6a4.2 4.2 0 0 0 5.3 5.4l-8.4 8.4a2.4 2.4 0 0 1-3.4-3.4z" />
+      <path d="M6.5 17.5h.01" />
+    </svg>
+  )
+}
+
+export function IconPaperclip({ size = 16, className }: IconProps) {
+  return (
+    <svg {...svgProps(size, className)}>
+      <path d="M20 11.5 12 19.4a4.6 4.6 0 0 1-6.5-6.5l8-7.9a3 3 0 0 1 4.3 4.3l-8 7.9a1.4 1.4 0 0 1-2-2l7.4-7.3" />
+    </svg>
+  )
+}
+
+export function IconFile({ size = 16, className }: IconProps) {
+  return (
+    <svg {...svgProps(size, className)}>
+      <path d="M14 3H7a1.5 1.5 0 0 0-1.5 1.5v15A1.5 1.5 0 0 0 7 21h10a1.5 1.5 0 0 0 1.5-1.5V7.5z" />
+      <path d="M14 3v4.5h4.5" />
+    </svg>
+  )
+}
+
+/** Guard mark for the approval strip: the agent is asking permission. */
+export function IconShield({ size = 16, className }: IconProps) {
+  return (
+    <svg {...svgProps(size, className)}>
+      <path d="M12 3l7 2.8v5.4c0 4.2-2.9 7.6-7 9.8-4.1-2.2-7-5.6-7-9.8V5.8z" />
+      <path d="M9.2 12.2 11.3 14.3 15 10.4" />
+    </svg>
+  )
+}
+
 export function IconKey({ size = 16, className }: IconProps) {
   return (
     <svg {...svgProps(size, className)}>
