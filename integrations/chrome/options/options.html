@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>DL Prism — Settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="panel">
+      <h1>DL Prism Companion</h1>
+      <p class="subtitle">Connection settings for your local gateway.</p>
+
+      <div id="permission-banner" class="banner banner-warning hidden">
+        <p id="permission-message">
+          DL Prism needs access to your local gateway (http://127.0.0.1 and http://localhost) before it can connect.
+        </p>
+        <button id="grant-access-btn" class="btn-secondary" type="button">Grant access to your local gateway</button>
+      </div>
+
+      <form id="settings-form">
+        <label for="base-url">Gateway base URL</label>
+        <input id="base-url" type="text" placeholder="http://127.0.0.1:8130" autocomplete="off" spellcheck="false" />
+        <p class="hint">Only http://127.0.0.1 and http://localhost origins are permitted.</p>
+
+        <label for="api-key">API key <span class="optional">(optional)</span></label>
+        <input id="api-key" type="password" placeholder="Bearer token, if your gateway requires one" autocomplete="off" spellcheck="false" />
+
+        <label for="default-model">Default model</label>
+        <input id="default-model" type="text" placeholder="auto" autocomplete="off" spellcheck="false" />
+        <p class="hint">Model id or alias, e.g. "auto", "qwen-coder". Matched against /v1/models when the popup opens.</p>
+
+        <div class="actions">
+          <button type="submit" class="btn-primary">Save</button>
+          <button type="button" id="test-connection" class="btn-secondary">Test connection</button>
+        </div>
+
+        <p id="save-status" class="status hidden"></p>
+        <p id="test-status" class="status hidden"></p>
+      </form>
+    </main>
+
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

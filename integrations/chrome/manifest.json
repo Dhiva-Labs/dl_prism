@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "DL Prism Companion",
+  "version": "1.0.0",
+  "description": "Chat with your local DL Prism AI gateway, pick models, and see routing decisions right from the browser toolbar.",
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "DL Prism",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": ["contextMenus", "storage"],
+  "host_permissions": ["http://127.0.0.1/*", "http://localhost/*"]
+}

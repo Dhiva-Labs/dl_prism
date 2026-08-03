@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>DL Prism</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="status-dot" id="status-dot" title="Checking gateway…"></span>
+          <span class="brand-name">DL Prism</span>
+        </div>
+        <div class="topbar-actions">
+          <select id="model-select" title="Model" aria-label="Model"></select>
+          <button id="open-options" class="icon-btn" title="Settings" aria-label="Settings">&#9881;</button>
+        </div>
+      </header>
+
+      <div id="permission-banner" class="banner banner-warning hidden">
+        <p id="permission-message">DL Prism needs access to your local gateway before it can connect.</p>
+        <div class="banner-actions">
+          <button id="grant-access-btn" class="btn-secondary" type="button">Grant access to your local gateway</button>
+        </div>
+      </div>
+
+      <div id="offline-banner" class="banner banner-error hidden">
+        <p id="offline-message">Can't reach the DL Prism gateway.</p>
+        <div class="banner-actions">
+          <button id="retry-connection" class="btn-secondary">Retry</button>
+          <button id="banner-open-options" class="btn-secondary">Open settings</button>
+        </div>
+      </div>
+
+      <main id="chat-log" class="chat-log" aria-live="polite"></main>
+
+      <form id="composer" class="composer">
+        <textarea
+          id="message-input"
+          rows="2"
+          placeholder="Ask DL Prism…  (Enter to send, Shift+Enter for a new line)"
+        ></textarea>
+        <button id="send-btn" type="submit" class="btn-primary">Send</button>
+      </form>
+
+      <footer class="footer">
+        <span id="spend-line" class="spend-line">Spend this month: —</span>
+        <a id="dashboard-link" class="dashboard-link" href="#" target="_blank" rel="noopener">Open dashboard</a>
+      </footer>
+    </div>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
