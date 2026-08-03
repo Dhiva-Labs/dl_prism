@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gateway:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+      - name: Format check
+        run: test -z "$(gofmt -l .)"
+      - name: Vet
+        run: go vet ./...
+      - name: Tests (race)
+        run: go test -race ./...
+      - name: Build
+        run: make build
+
+  dashboard:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc -b --force
+      - name: Build
+        run: npm run build
+
+  extensions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: VS Code extension typecheck + bundle
+        working-directory: integrations/vscode
+        run: npm ci && npx tsc --noEmit && node esbuild.js
+      - name: Chrome extension syntax pass
+        working-directory: integrations/chrome
+        run: |
+          for f in $(find . -name '*.js' -not -path './node_modules/*'); do
+            node --input-type=module -e "await import('file://$PWD/$f').catch(e => { if (e instanceof SyntaxError) { console.error('$f:', e.message); process.exit(1); } })"
+          done
