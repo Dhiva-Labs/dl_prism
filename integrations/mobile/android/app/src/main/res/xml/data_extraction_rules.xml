@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The API key lives in FlutterSecureStorage's Keystore-backed
+  EncryptedSharedPreferences file; restoring that ciphertext onto a
+  different device (a different Keystore) would restore something nothing
+  on that device can decrypt, so it is excluded from both channels rather
+  than shipped as dead weight. The base URL/default model in ordinary
+  shared_preferences are not secrets, but they are also not something worth
+  restoring onto a new device pointed at a possibly different gateway —
+  re-running Onboarding there is one screen, not a chore.
+
+  android:allowBackup="false" on <application> already covers the cloud
+  side on every API level; <cloud-backup> is restated here so it does not
+  depend on that attribute alone. <device-transfer> is the half
+  allowBackup no longer covers from Android 12 onwards.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="."/>
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="."/>
+    </device-transfer>
+</data-extraction-rules>
