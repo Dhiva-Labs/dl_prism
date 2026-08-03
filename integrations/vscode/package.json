@@ -1,0 +1,140 @@
+{
+  "name": "dl-prism",
+  "displayName": "DL Prism",
+  "description": "Chat, route explain, and spend tracking for the DL Prism local AI gateway, right inside VS Code.",
+  "version": "0.1.0",
+  "publisher": "dhivalabs",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Machine Learning"
+  ],
+  "keywords": [
+    "ai",
+    "llm",
+    "gateway",
+    "chat",
+    "routing"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "dlPrism",
+          "title": "DL Prism",
+          "icon": "media/prism-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "dlPrism": [
+        {
+          "id": "dlPrismChatView",
+          "name": "Chat",
+          "type": "webview",
+          "icon": "media/prism-icon.svg",
+          "contextualTitle": "DL Prism"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "dlPrism.askAboutSelection",
+        "title": "DL Prism: Ask About Selection",
+        "category": "DL Prism"
+      },
+      {
+        "command": "dlPrism.explainRouting",
+        "title": "DL Prism: Explain Routing",
+        "category": "DL Prism"
+      },
+      {
+        "command": "dlPrism.switchModel",
+        "title": "DL Prism: Switch Model",
+        "category": "DL Prism"
+      },
+      {
+        "command": "dlPrism.openDashboard",
+        "title": "DL Prism: Open Dashboard",
+        "category": "DL Prism"
+      },
+      {
+        "command": "dlPrism.clearChat",
+        "title": "DL Prism: Clear Chat",
+        "category": "DL Prism",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "dlPrism.focusChat",
+        "title": "DL Prism: Open Chat",
+        "category": "DL Prism"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "dlPrism.askAboutSelection",
+          "when": "editorHasSelection"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "dlPrism.askAboutSelection",
+          "when": "editorHasSelection",
+          "group": "dlPrism"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "dlPrism.clearChat",
+          "when": "view == dlPrismChatView",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "DL Prism",
+      "properties": {
+        "dlPrism.baseUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:8130",
+          "description": "Base URL of the DL Prism gateway (no trailing slash)."
+        },
+        "dlPrism.apiKey": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Optional bearer key sent as `Authorization: Bearer <key>` to the gateway. **Sensitive** — this is stored in plain text in your VS Code settings, so prefer a per-machine local gateway key and avoid syncing this setting.",
+          "editPresentation": "password"
+        },
+        "dlPrism.model": {
+          "type": "string",
+          "default": "auto",
+          "description": "Default model id (or \"auto\") used for chat, status bar display, and new requests."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "node esbuild.js",
+    "build:apiclient": "esbuild src/apiClient.ts --bundle --platform=node --format=esm --outfile=dist/apiClient.mjs",
+    "smoke": "npm run build:apiclient && node scripts/smoke-test.mjs",
+    "vscode:prepublish": "npm run build",
+    "package": "npx @vscode/vsce package --no-dependencies --allow-missing-repository"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.24.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.3.3"
+  }
+}

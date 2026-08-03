@@ -1,0 +1,12 @@
+.vscode/**
+src/**
+scripts/**
+out/**
+node_modules/**
+.gitignore
+esbuild.js
+tsconfig.json
+dist/**/*.map
+dist/apiClient.mjs
+**/*.ts
+**/tsconfig*.json
