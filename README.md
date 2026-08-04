@@ -99,6 +99,24 @@ prism usage
 prism mcp     [--gateway url] [--api-key key]   # MCP server over stdio
 ```
 
+## Workbench: projects and the acting agent
+
+The dashboard's **Projects** section keeps conversations, attached
+knowledge, and an agent together per project. The agent can act — list,
+read, and write files, run shell commands, fetch the web — inside a
+per-project sandboxed `workspace/` it cannot escape. Agency is **off**
+until you enable it in project settings; writes and shell commands wait
+for your explicit approval by default, and every tool call is shown as
+it happens. Agent turns route through the normal chain, so policies,
+failover, and budgets apply. State lives in
+`~/.local/share/prism/workbench/` as plain files.
+
+Pick a **tools-capable model** for agent projects (e.g. `llama3.1:8b`
+locally, or any cloud model with the `tools` capability): coder-tuned
+small models often *describe* tool calls as text instead of emitting
+them, in which case the agent degrades to plain chat. Browser and video
+tools are planned — see [docs/WORKBENCH_PLAN.md](docs/WORKBENCH_PLAN.md).
+
 ## Claude Code & MCP
 
 Two ways in, both covered in **[docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)**

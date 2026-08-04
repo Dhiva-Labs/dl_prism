@@ -14,7 +14,8 @@ import {
   appendDelta,
   awaitApproval,
   closeRun,
-  markDecision,
+  pendingDecision,
+  settleDecision,
   message,
   settleTool,
   startTool,
@@ -147,19 +148,16 @@ export function Conversation({
 
   const decide = useCallback(
     async (callId: string, approve: boolean) => {
-      setItems((prev) => markDecision(prev, callId, { decisionPending: true }))
+      setItems((prev) => pendingDecision(prev, callId))
       try {
         await approveTool({ chat_id: chatId, tool_call_id: callId, approve })
-        setItems((prev) =>
-          markDecision(prev, callId, {
-            decisionPending: false,
-            state: approve ? 'approved' : 'denied',
-          }),
-        )
+        // The tool_result for this call may already have arrived on the run
+        // stream; settleDecision leaves such a card alone.
+        setItems((prev) => settleDecision(prev, callId, approve ? 'approved' : 'denied'))
       } catch (err) {
         const detail = err instanceof ApiError ? err.message : String(err)
         setNotice(`Couldn't send the decision: ${detail}`)
-        setItems((prev) => markDecision(prev, callId, { decisionPending: false, state: 'awaiting' }))
+        setItems((prev) => settleDecision(prev, callId, undefined))
       }
     },
     [chatId],

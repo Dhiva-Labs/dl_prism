@@ -47,7 +47,16 @@ func (s *Server) Handler() http.Handler {
 		io.WriteString(w, "ok\n")
 	})
 	sub, _ := fs.Sub(ui.Dist, "dist")
-	mux.Handle("GET /", http.FileServerFS(sub))
+	spa := http.FileServerFS(sub)
+	mux.Handle("GET /", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Assets carry content hashes and may cache freely, but the document
+		// must always revalidate — a cached index.html would pin an old
+		// bundle against a newer gateway binary.
+		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
+			w.Header().Set("Cache-Control", "no-cache")
+		}
+		spa.ServeHTTP(w, r)
+	}))
 	mux.HandleFunc("POST /v1/chat/completions", s.auth(s.handleChat))
 	mux.HandleFunc("POST /v1/messages", s.auth(s.handleMessages))
 	mux.HandleFunc("POST /v1/messages/count_tokens", s.auth(s.handleCountTokens))

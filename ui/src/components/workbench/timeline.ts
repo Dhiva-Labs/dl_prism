@@ -128,9 +128,17 @@ export function awaitApproval(items: TimelineItem[], callId: string): TimelineIt
 }
 
 /**
- * `approved: false` is the gateway's verdict and wins. When the field is
- * absent (an ungated call, or an older gateway) the local decision stands, so
- * a card the user denied here keeps saying denied.
+ * A `tool_result` is the gateway reporting on the call, so it always settles
+ * the card — it must never leave one in a pre-result state
+ * (`running`/`awaiting`/`approved`), which `closeRun` would later brand
+ * "incomplete".
+ *
+ *   approved: false → denied (the only verdict the gateway sends)
+ *   approved: true  → done
+ *   absent          → done, EXCEPT for a call this session denied, whose
+ *                     verdict is already known locally. Per the contract only
+ *                     denials carry the flag, so "absent" is the ordinary
+ *                     approved-or-ungated case and must reach `done`.
  */
 function resolvedState(previous: ToolState, approved: boolean | undefined): ToolState {
   if (approved === false) return 'denied'
@@ -155,12 +163,44 @@ export function settleTool(
   )
 }
 
-export function markDecision(
+/**
+ * True once the gateway has reported on the call. Settled is terminal: the
+ * approval round-trip below must not walk a card back out of it.
+ */
+function isSettled(tool: TimelineTool): boolean {
+  return tool.state === 'done' || tool.state === 'denied' || tool.output !== undefined
+}
+
+/** The Approve/Deny POST is in flight — freeze the buttons. */
+export function pendingDecision(items: TimelineItem[], callId: string): TimelineItem[] {
+  return items.map((item) =>
+    item.kind === 'tool' && item.callId === callId && !isSettled(item)
+      ? { ...item, decisionPending: true }
+      : item,
+  )
+}
+
+/**
+ * The Approve/Deny POST came back. `outcome` is what the user chose, or
+ * undefined when the POST itself failed and the strip has to come back.
+ *
+ * The guard is the point: the gateway resumes the tool the moment it receives
+ * the approval, so `tool_result` routinely overtakes this POST's own response
+ * (a fast local model writing a small file wins that race every time). Forcing
+ * `approved` here would drag an already-settled card back to a pre-result
+ * state and strand it as "incomplete" for the rest of the run. A settled card
+ * only ever loses its pending flag.
+ */
+export function settleDecision(
   items: TimelineItem[],
   callId: string,
-  changes: Partial<TimelineTool>,
+  outcome: 'approved' | 'denied' | undefined,
 ): TimelineItem[] {
-  return patchTool(items, callId, changes)
+  return items.map((item) => {
+    if (item.kind !== 'tool' || item.callId !== callId) return item
+    if (isSettled(item)) return { ...item, decisionPending: false }
+    return { ...item, decisionPending: false, state: outcome ?? 'awaiting' }
+  })
 }
 
 /** Terminal states for the whole run: nothing is left pending or awaiting. */
