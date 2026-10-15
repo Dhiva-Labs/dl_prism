@@ -1,5 +1,11 @@
 # DL Prism
 
+[![ARM64 builds](https://github.com/Dhiva-Labs/dl_prism/actions/workflows/builds.yml/badge.svg?branch=main)](https://github.com/Dhiva-Labs/dl_prism/actions/workflows/builds.yml)
+[![CI](https://github.com/Dhiva-Labs/dl_prism/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Dhiva-Labs/dl_prism/actions/workflows/ci.yml)
+![Gateway: Linux x64 | arm64](https://img.shields.io/badge/Gateway%20Linux-x64%20%7C%20arm64-informational?logo=linux&logoColor=white)
+![Gateway: Windows x64 | arm64](https://img.shields.io/badge/Gateway%20Windows-x64%20%7C%20arm64-informational?logo=windows&logoColor=white)
+![Desktop companion: Linux x64 | arm64](https://img.shields.io/badge/Desktop%20companion%20Linux-x64%20%7C%20arm64-informational?logo=linux&logoColor=white)
+
 <p align="center">
   <img src="docs/design/spectral-discipline-plate-i.png" alt="PLATE I — one beam dispersed into a labeled spectrum of AI providers" width="560">
 </p>
@@ -18,6 +24,30 @@ Because Prism speaks the OpenAI wire protocol, Claude Code, Cursor,
 Windsurf, Continue, Codex CLI, and anything else with a configurable
 `base_url` can use it unchanged — set the base URL to
 `http://127.0.0.1:8130/v1` and pick a model (or `auto`).
+
+## Install
+
+Release assets, built in CI on a native runner of each architecture
+(`.github/workflows/builds.yml`):
+
+| Asset | What it is |
+|---|---|
+| `prism-<version>-linux-amd64`, `prism-<version>-linux-arm64` | The gateway, a single static binary with the dashboard embedded |
+| `prism-<version>-windows-amd64.exe`, `prism-<version>-windows-arm64.exe` | The same gateway for Windows |
+| `dl-prism-desktop-full-<version>-linux-x64.tar.gz`, `...-linux-arm64.tar.gz` | The Flutter desktop companion with the embedded WebKitGTK dashboard window (needs `libwebkit2gtk-4.1-0`) |
+| `dl-prism-desktop-engine-<version>-linux-x64.tar.gz`, `...-linux-arm64.tar.gz` | The same companion without the WebKitGTK dependency; "Open dashboard" uses your browser |
+
+```bash
+# gateway (pick the file for `uname -m`: x86_64 = amd64, aarch64 = arm64)
+chmod +x prism-<version>-linux-arm64 && ./prism-<version>-linux-arm64 version
+
+# desktop companion
+tar -xzf dl-prism-desktop-engine-<version>-linux-arm64.tar.gz
+./dl-prism-desktop-engine-<version>-linux-arm64/desktop
+```
+
+The desktop tarballs are built on Ubuntu 24.04, so they need that release's GTK 3 and C library or
+newer. The companion is Linux-only; there is no Windows build of it.
 
 ## Quick start
 
