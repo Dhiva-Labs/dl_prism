@@ -61,7 +61,17 @@ cd "$ROOT_DIR"
 DIST_DIR="$ROOT_DIR/dist"
 FULL_DIR="$DIST_DIR/dl-prism-desktop-full"
 ENGINE_DIR="$DIST_DIR/dl-prism-desktop-engine"
-BUNDLE_SRC="$ROOT_DIR/build/linux/x64/release/bundle"
+# Flutter writes the bundle to build/linux/<x64|arm64>/release/bundle, named for
+# the machine that runs the build.
+case "$(uname -m)" in
+  x86_64) FLUTTER_ARCH=x64 ;;
+  aarch64 | arm64) FLUTTER_ARCH=arm64 ;;
+  *)
+    echo "error: unsupported machine '$(uname -m)' (x86_64 or aarch64)" >&2
+    exit 1
+    ;;
+esac
+BUNDLE_SRC="$ROOT_DIR/build/linux/$FLUTTER_ARCH/release/bundle"
 
 PUBSPEC="$ROOT_DIR/pubspec.yaml"
 WEBVIEW_FILE="$ROOT_DIR/lib/services/dashboard_webview.dart"
