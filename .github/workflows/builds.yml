@@ -1,0 +1,391 @@
+name: Builds
+
+# Release-style builds for Linux and Windows on x64 and arm64:
+#
+#   desktop   Flutter companion app (integrations/desktop), Linux only, both
+#             variants (full = embedded WebKitGTK dashboard, engine = browser only)
+#   gateway   the Go gateway (cmd/prism): Linux and Windows, amd64 and arm64
+#
+# Every leg builds on a runner of its own architecture, so what it builds is
+# also what it runs. On a published release all of it is attached to the release.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  FLUTTER_VERSION: '3.44.6'
+
+jobs:
+  # The gateway embeds the dashboard (ui/dist). The committed copy would build,
+  # but release binaries should carry a dashboard built from this commit.
+  ui:
+    name: Dashboard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - name: Compare with the committed dashboard
+        working-directory: .
+        run: |
+          git status --short ui/dist
+          git diff --stat -- ui/dist | tail -n 5
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ui-dist
+          path: ui/dist
+          if-no-files-found: error
+          retention-days: 7
+
+  desktop:
+    name: Desktop Linux ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-24.04
+            elf_machine: x86-64
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            elf_machine: ARM aarch64
+    defaults:
+      run:
+        working-directory: integrations/desktop
+    env:
+      ELF_MACHINE: ${{ matrix.elf_machine }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # libwebkit2gtk-4.1-dev: the full variant (desktop_webview_window) needs it.
+      # xvfb, xauth, xdotool, dbus-x11, imagemagick: the smoke run below.
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev libstdc++-12-dev \
+            libwebkit2gtk-4.1-dev \
+            libgl1-mesa-dri libegl1 \
+            file binutils xvfb xauth xdotool dbus-x11 imagemagick
+
+      - name: Install Flutter ${{ env.FLUTTER_VERSION }}
+        run: |
+          git clone --depth 1 --branch "$FLUTTER_VERSION" \
+            https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Configure Flutter
+        run: |
+          uname -m
+          flutter config --no-analytics --enable-linux-desktop
+          flutter precache --linux
+          flutter --version
+          dart --version
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: Test
+        run: flutter test
+
+      # Builds both variants into dist/ (the engine one with the webview
+      # dependency removed), then puts the tree back to the full configuration.
+      - name: Build both variants
+        run: tool/build_variants.sh
+
+      - name: Assert every ELF file in both bundles is ${{ matrix.elf_machine }}
+        run: |
+          for v in full engine; do
+            for f in desktop lib/libapp.so lib/libflutter_linux_gtk.so; do
+              [ -f "dist/dl-prism-desktop-$v/$f" ] || { echo "::error::missing dist/dl-prism-desktop-$v/$f"; exit 1; }
+            done
+          done
+          checked=0
+          bad=0
+          while IFS= read -r -d '' f; do
+            desc="$(file -b "$f")"
+            case "$desc" in ELF*) ;; *) continue ;; esac
+            echo "$f: $desc"
+            checked=$((checked + 1))
+            case "$desc" in
+              *"$ELF_MACHINE"*) ;;
+              *) echo "::error file=$f::not $ELF_MACHINE"; bad=1 ;;
+            esac
+          done < <(find dist -type f -print0)
+          echo "checked $checked ELF files"
+          [ "$checked" -ge 8 ] && [ "$bad" -eq 0 ]
+
+      # The two variants differ in one thing: whether the WebKitGTK plugin is
+      # part of the bundle. With the linker's --as-needed default the runner
+      # executable itself may not record the dependency, so check the plugin.
+      - name: Check the variants' WebKitGTK linkage
+        run: |
+          readelf -d dist/dl-prism-desktop-full/desktop | grep NEEDED
+          plugin=dist/dl-prism-desktop-full/lib/libdesktop_webview_window_plugin.so
+          [ -f "$plugin" ] || { echo "::error::$plugin missing"; exit 1; }
+          readelf -d "$plugin" | grep -q 'NEEDED.*libwebkit2gtk-4.1' \
+            || { echo "::error::$plugin does not need libwebkit2gtk-4.1"; exit 1; }
+          [ ! -e dist/dl-prism-desktop-engine/lib/libdesktop_webview_window_plugin.so ] \
+            || { echo "::error::the engine variant ships the webview plugin"; exit 1; }
+          bad=0
+          while IFS= read -r -d '' f; do
+            case "$(file -b "$f")" in ELF*) ;; *) continue ;; esac
+            if readelf -d "$f" | grep -q 'NEEDED.*webkit'; then
+              echo "::error file=$f::the engine variant links WebKitGTK"
+              bad=1
+            fi
+          done < <(find dist/dl-prism-desktop-engine -type f -print0)
+          [ "$bad" -eq 0 ]
+          echo "full links WebKitGTK, engine does not"
+
+      - name: Package tarballs
+        run: |
+          tool/package_linux.sh dist/tarballs
+          ls -l dist/tarballs
+          [ "$(ls dist/tarballs | wc -l)" -eq 2 ]
+
+      - name: Unpack the tarballs and smoke-run them (Xvfb)
+        timeout-minutes: 8
+        run: |
+          VERSION="$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d+ -f1)"
+          ARCH='${{ matrix.arch }}'
+          for v in full engine; do
+            NAME="dl-prism-desktop-$v-${VERSION}-linux-${ARCH}"
+            tar -xzf "dist/tarballs/$NAME.tar.gz" -C "$RUNNER_TEMP"
+            file "$RUNNER_TEMP/$NAME/desktop" | tee /dev/stderr | grep "$ELF_MACHINE"
+            tool/smoke_xvfb.sh "$RUNNER_TEMP/$NAME/desktop" '^DL Prism Desktop$' "$RUNNER_TEMP/shots/$v-$ARCH.png"
+          done
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: desktop-linux-${{ matrix.arch }}
+          path: integrations/desktop/dist/tarballs/*.tar.gz
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: smoke-screenshots-${{ matrix.arch }}
+          path: ${{ runner.temp }}/shots/*.png
+          if-no-files-found: error
+          retention-days: 7
+
+  gateway:
+    name: Gateway ${{ matrix.os }}/${{ matrix.goarch }}
+    needs: ui
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            goarch: amd64
+            runner: ubuntu-24.04
+            ext: ''
+            machine: x86-64
+          - os: linux
+            goarch: arm64
+            runner: ubuntu-24.04-arm
+            ext: ''
+            machine: ARM aarch64
+          - os: windows
+            goarch: amd64
+            runner: windows-latest
+            ext: .exe
+            machine: '0x8664'
+          - os: windows
+            goarch: arm64
+            runner: windows-11-arm
+            ext: .exe
+            machine: '0xAA64'
+    defaults:
+      run:
+        shell: bash
+    env:
+      GOOS: ${{ matrix.os }}
+      GOARCH: ${{ matrix.goarch }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: ui-dist
+          path: ui/dist
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Show the toolchain
+        run: |
+          go version
+          go env GOOS GOARCH GOHOSTARCH CGO_ENABLED
+
+      # Same flags as `make release`; VERSION comes from the Makefile.
+      - name: Build
+        run: |
+          VERSION="$(sed -n 's/^VERSION ?= *//p' Makefile)"
+          [ -n "$VERSION" ]
+          mkdir -p dist
+          OUT="dist/prism-${VERSION}-${GOOS}-${GOARCH}${{ matrix.ext }}"
+          go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o "$OUT" ./cmd/prism
+          echo "OUT=$OUT" >> "$GITHUB_ENV"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          ls -l dist
+
+      - name: Assert the binary is ${{ matrix.goarch }} (ELF)
+        if: matrix.os == 'linux'
+        run: |
+          file "$OUT" | tee /dev/stderr | grep '${{ matrix.machine }}'
+
+      - name: Assert the binary is ${{ matrix.goarch }} (PE machine ${{ matrix.machine }})
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          $fs = [IO.File]::OpenRead((Resolve-Path $env:OUT))
+          try {
+            $br = New-Object IO.BinaryReader($fs)
+            $fs.Position = 0x3C
+            $fs.Position = $br.ReadInt32()
+            if ($br.ReadUInt32() -ne 0x4550) { throw "$env:OUT is not a PE file" }
+            $machine = $br.ReadUInt16()
+          } finally { $fs.Dispose() }
+          'PE machine 0x{0:X4}' -f $machine
+          if ($machine -ne [Convert]::ToUInt16('${{ matrix.machine }}', 16)) { throw "wrong PE machine" }
+
+      # The repo's own Go suite, on the leg's own architecture. The race
+      # detector exists on linux and windows/amd64 only. internal/workbench is
+      # left out on Windows: its tests assume a POSIX host (/etc/passwd, /tmp,
+      # a scrubbed POSIX environment) and failed on windows/arm64 for that
+      # reason, not because of the CPU.
+      - name: Test
+        run: |
+          pkgs="./..."
+          if [ "$GOOS" = windows ]; then
+            pkgs="$(go list ./... | grep -v '/internal/workbench$')"
+          fi
+          if [ "$GOOS/$GOARCH" = windows/arm64 ]; then
+            go test $pkgs
+          else
+            go test -race $pkgs
+          fi
+
+      # Run the binary that was just built: version, a routing dry-run from the
+      # example config, then serve it and read /healthz, /admin/status and the
+      # embedded dashboard.
+      - name: Run the gateway
+        timeout-minutes: 5
+        run: |
+          "$OUT" version | tee version.txt
+          grep -qx "prism ${VERSION}" version.txt
+          "$OUT" explain -c prism.example.yaml "Write a Python dedupe function"
+          "$OUT" serve -c prism.example.yaml --listen 127.0.0.1:18130 --offline > serve.log 2>&1 &
+          pid=$!
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18130/healthz > /dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:18130/healthz
+          curl -fsS http://127.0.0.1:18130/admin/status | tee status.json
+          grep -Eq "\"version\": *\"${VERSION}\"" status.json
+          curl -fsS http://127.0.0.1:18130/ | grep -qi '<div id="root"'
+          kill "$pid" || true
+          cat serve.log
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: gateway-${{ matrix.os }}-${{ matrix.goarch }}
+          path: dist/prism-*
+          if-no-files-found: error
+
+  release:
+    name: Release assets
+    needs: [desktop, gateway]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: |
+            Makefile
+            integrations/desktop/pubspec.yaml
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: desktop-linux-*
+          path: assets
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: gateway-*
+          path: assets
+          merge-multiple: true
+
+      - name: Check the release assets
+        run: |
+          DESKTOP="$(grep '^version:' integrations/desktop/pubspec.yaml | awk '{print $2}' | cut -d+ -f1)"
+          GATEWAY="$(sed -n 's/^VERSION ?= *//p' Makefile)"
+          ls -l assets
+          expected="
+          dl-prism-desktop-full-${DESKTOP}-linux-x64.tar.gz
+          dl-prism-desktop-full-${DESKTOP}-linux-arm64.tar.gz
+          dl-prism-desktop-engine-${DESKTOP}-linux-x64.tar.gz
+          dl-prism-desktop-engine-${DESKTOP}-linux-arm64.tar.gz
+          prism-${GATEWAY}-linux-amd64
+          prism-${GATEWAY}-linux-arm64
+          prism-${GATEWAY}-windows-amd64.exe
+          prism-${GATEWAY}-windows-arm64.exe"
+          for f in $expected; do
+            [ -f "assets/$f" ] || { echo "::error::missing assets/$f"; exit 1; }
+          done
+          [ "$(ls assets | wc -l)" -eq 8 ]
+          if [ -n "$TAG" ] && [ "$TAG" != "v$GATEWAY" ]; then
+            echo "::warning::release tag $TAG differs from the gateway version $GATEWAY in the Makefile; asset names carry $GATEWAY"
+          fi
+
+      # Hand-uploaded assets win: names already on the release are skipped.
+      - name: Upload to release ${{ github.event.release.tag_name }}
+        if: github.event_name == 'release'
+        run: |
+          existing="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name')"
+          for f in assets/*; do
+            name="$(basename "$f")"
+            if printf '%s\n' "$existing" | grep -qxF -- "$name"; then
+              echo "skip $name (already on the release)"
+            else
+              echo "upload $name"
+              gh release upload "$TAG" "$f" --repo "$GITHUB_REPOSITORY"
+            fi
+          done

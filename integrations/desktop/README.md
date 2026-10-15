@@ -268,13 +268,19 @@ above). To get both variants — including a genuine engine/lite bundle —
 use `tool/build_variants.sh` instead of calling `flutter build` directly;
 see **Variants** above for why.
 
-The release binary and its bundled assets land at:
+The release binary and its bundled assets land at (`<arch>` is `x64` or `arm64`, whichever
+machine you build on; Flutter does not cross-compile Linux apps):
 
 ```
-build/linux/x64/release/bundle/desktop          # flutter build linux, either variant
+build/linux/<arch>/release/bundle/desktop       # flutter build linux, either variant
 dist/dl-prism-desktop-full/desktop              # tool/build_variants.sh
 dist/dl-prism-desktop-engine/desktop            # tool/build_variants.sh
 ```
+
+`tool/package_linux.sh` packs the two `dist/` bundles into
+`dl-prism-desktop-<variant>-<version>-linux-<arch>.tar.gz`, and `tool/smoke_xvfb.sh <binary> <window title
+regex> <screenshot.png>` starts an app on a virtual display and checks that it renders. CI
+(`.github/workflows/builds.yml`) runs both on `ubuntu-24.04` and `ubuntu-24.04-arm`.
 
 Run it directly, or copy the whole bundle directory wherever you like —
 it's self-contained (the executable expects its `data/` and `lib/`
