@@ -262,3 +262,15 @@ v0.2.0 — M0–M3 of the plan plus the companion surfaces:
 Planned next (M4): hybrid pipelines (`pipeline:<name>`), tool-call
 translation for the anthropic adapter, config import/export, hardware-aware
 routing, load-balancing weights, Flutter desktop shell.
+
+## Sponsors
+
+Dhiva Labs is an independent, self-funded lab. [Sponsorships](https://github.com/sponsors/Dhiva-Labs) help bring this project and the rest of Dhiva Labs to every platform, iPhone and Mac included.
+
+[![Sponsor Dhiva Labs](https://img.shields.io/badge/Sponsor-Dhiva%20Labs-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/Dhiva-Labs)
+
+Monthly sponsors at $10 and up are listed here:
+
+<!-- sponsors -->
+*Be the first: [sponsor Dhiva Labs](https://github.com/sponsors/Dhiva-Labs).*
+<!-- sponsors -->
