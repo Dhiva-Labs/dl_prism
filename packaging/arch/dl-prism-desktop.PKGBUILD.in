@@ -1,0 +1,41 @@
+# Maintainer: Dhiva Labs <dhivakar1010@gmail.com>
+#
+# AUR package for the DL Prism desktop companion (the engine variant: the
+# dashboard opens in the browser, no WebKitGTK). It installs the Flutter
+# bundle from the GitHub release tarball (the one every other format ships)
+# plus the desktop entry, icon and licenses from the release tag.
+# packaging/arch/aur.sh renders this file for each release (version and
+# checksums) and checks it with makepkg; the rendered PKGBUILD and .SRCINFO
+# are what gets pushed to the AUR.
+pkgname=dl-prism-desktop-bin
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc='@SUMMARY@'
+arch=('x86_64' 'aarch64')
+url='@HOMEPAGE@'
+license=('@LICENSE@')
+depends=(@ARCH_DEPENDS@)
+provides=('dl-prism-desktop')
+conflicts=('dl-prism-desktop')
+options=('!strip' '!debug')
+_raw="https://raw.githubusercontent.com/@GITHUB_REPO@/@TAG@"
+source=(@SOURCES@)
+source_x86_64=("dl-prism-desktop-$pkgver-x86_64.tar.gz::@RELEASE_URL@/dl-prism-desktop-engine-$pkgver-linux-x64.tar.gz")
+source_aarch64=("dl-prism-desktop-$pkgver-aarch64.tar.gz::@RELEASE_URL@/dl-prism-desktop-engine-$pkgver-linux-arm64.tar.gz")
+sha256sums=(@SHA256SUMS@)
+sha256sums_x86_64=('@SHA_X64@')
+sha256sums_aarch64=('@SHA_ARM64@')
+
+package() {
+  local dir
+  case "$CARCH" in
+    x86_64) dir="dl-prism-desktop-engine-$pkgver-linux-x64" ;;
+    aarch64) dir="dl-prism-desktop-engine-$pkgver-linux-arm64" ;;
+  esac
+  install -d "$pkgdir/usr/lib/dl-prism-desktop" "$pkgdir/usr/bin"
+  cp -a "$dir/." "$pkgdir/usr/lib/dl-prism-desktop/"
+  ln -s ../lib/dl-prism-desktop/desktop "$pkgdir/usr/bin/dl-prism-desktop"
+  install -Dm644 com.dhivalabs.prism.desktop.desktop -t "$pkgdir/usr/share/applications"
+  install -Dm644 com.dhivalabs.prism.desktop.png -t "$pkgdir/usr/share/icons/hicolor/192x192/apps"
+  install -Dm644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE NOTICE
+}

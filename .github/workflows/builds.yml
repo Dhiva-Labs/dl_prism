@@ -5,6 +5,9 @@ name: Builds
 #   desktop   Flutter companion app (integrations/desktop), Linux only, both
 #             variants (full = embedded WebKitGTK dashboard, engine = browser only)
 #   gateway   the Go gateway (cmd/prism): Linux and Windows, amd64 and arm64
+#   distros   both repackaged for other Linux distributions: .rpm, Arch
+#             packages and AUR recipes, plus an AppImage and a Flatpak of the
+#             desktop companion with the gateway inside
 #
 # Every leg builds on a runner of its own architecture, so what it builds is
 # also what it runs. On a published release all of it is attached to the release.
@@ -323,9 +326,214 @@ jobs:
           path: dist/prism-*
           if-no-files-found: error
 
+  # Packages for distributions beyond Debian/Ubuntu, from what the jobs
+  # above built and tested: the gateway as dl-prism (.rpm, Arch package; a
+  # command-line server) and the desktop companion's engine variant as
+  # dl-prism-desktop (.rpm, Arch package, AppImage carrying the gateway).
+  # Each is installed on its real distribution and run there
+  # (packaging/linux-distros/).
+  distros:
+    name: Other distros ${{ matrix.arch }}
+    needs: [desktop, gateway]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64, goarch: amd64, deb_arch: amd64, runner: ubuntu-24.04 }
+          - { arch: arm64, goarch: arm64, deb_arch: arm64, runner: ubuntu-24.04-arm }
+    env:
+      NFPM_VERSION: '2.48.0'
+      APPIMAGETOOL_VERSION: '1.9.1'
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: gateway-linux-${{ matrix.goarch }}
+          path: gateway
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: desktop-linux-${{ matrix.arch }}
+          path: desktop
+
+      - name: Install nfpm and appimagetool
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          case "$(uname -m)" in
+            x86_64) nfpm_arch=x86_64; ai_arch=x86_64 ;;
+            aarch64) nfpm_arch=arm64; ai_arch=aarch64 ;;
+          esac
+          mkdir -p "$RUNNER_TEMP/bin"
+          cd "$RUNNER_TEMP/bin"
+          tarball="nfpm_${NFPM_VERSION}_Linux_${nfpm_arch}.tar.gz"
+          gh release download "v$NFPM_VERSION" -R goreleaser/nfpm -p "$tarball" -p checksums.txt
+          grep " $tarball\$" checksums.txt | sha256sum -c -
+          tar -xzf "$tarball" nfpm
+          gh release download "$APPIMAGETOOL_VERSION" -R AppImage/appimagetool \
+            -p "appimagetool-$ai_arch.AppImage" -O appimagetool
+          chmod +x appimagetool
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Build .rpm, Arch packages and AppImage
+        run: |
+          GATEWAY="$(sed -n 's/^VERSION ?= *//p' Makefile)"
+          DESKTOP="$(grep '^version:' integrations/desktop/pubspec.yaml | awk '{print $2}' | cut -d+ -f1)"
+          gw="$RUNNER_TEMP/gateway-root"
+          dt="$RUNNER_TEMP/desktop-root"
+          COMPONENT=gateway packaging/linux-distros/make-tree.sh \
+            "gateway/prism-$GATEWAY-linux-${{ matrix.goarch }}" "$gw"
+          COMPONENT=gateway VERSION="$GATEWAY" packaging/linux-distros/pack.sh "$gw" ${{ matrix.deb_arch }} dist/gateway
+          COMPONENT=desktop packaging/linux-distros/make-tree.sh \
+            "desktop/dl-prism-desktop-engine-$DESKTOP-linux-${{ matrix.arch }}.tar.gz" "$dt"
+          COMPONENT=desktop VERSION="$DESKTOP" APPIMAGE_MERGE_TREE="$gw" \
+            packaging/linux-distros/pack.sh "$dt" ${{ matrix.deb_arch }} dist/desktop
+          # The Flatpak job builds from both trees; tar keeps modes and symlinks.
+          mkdir "$RUNNER_TEMP/flatpak-tree"
+          cp -a "$gw/." "$dt/." "$RUNNER_TEMP/flatpak-tree/"
+          tar -C "$RUNNER_TEMP/flatpak-tree" -cJf "$RUNNER_TEMP/tree.tar.xz" .
+
+      # The companion's packages depend on the gateway's, so its checks
+      # install both together.
+      - name: Install and run on Fedora, openSUSE and Arch
+        timeout-minutes: 25
+        run: |
+          COMPONENT=gateway packaging/linux-distros/verify.sh dist/gateway ${{ matrix.deb_arch }}
+          COMPONENT=desktop WITH_PKGS=dist/gateway packaging/linux-distros/verify.sh dist/desktop ${{ matrix.deb_arch }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: distros-${{ matrix.arch }}
+          path: |
+            dist/*/*.rpm
+            dist/*/*.pkg.tar.zst
+            dist/*/*.AppImage
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: tree-${{ matrix.arch }}
+          path: ${{ runner.temp }}/tree.tar.xz
+          if-no-files-found: error
+          retention-days: 3
+
+  # AUR recipes: PKGBUILD + .SRCINFO for dl-prism-bin and
+  # dl-prism-desktop-bin, rendered with the checksums of this run's release
+  # files and proven with makepkg on archlinux:latest.
+  aur:
+    name: AUR PKGBUILDs
+    needs: [desktop, gateway]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: gateway-linux-*
+          path: assets
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: desktop-linux-*
+          path: assets
+          merge-multiple: true
+
+      - name: Render and check the PKGBUILDs
+        run: |
+          export GATEWAY_VERSION="$(sed -n 's/^VERSION ?= *//p' Makefile)"
+          export DESKTOP_VERSION="$(grep '^version:' integrations/desktop/pubspec.yaml | awk '{print $2}' | cut -d+ -f1)"
+          packaging/arch/aur.sh \
+            "assets/prism-$GATEWAY_VERSION-linux-amd64" "assets/prism-$GATEWAY_VERSION-linux-arm64" \
+            "assets/dl-prism-desktop-engine-$DESKTOP_VERSION-linux-x64.tar.gz" \
+            "assets/dl-prism-desktop-engine-$DESKTOP_VERSION-linux-arm64.tar.gz" dist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: aur
+          path: dist/*-aur.tar.gz
+          if-no-files-found: error
+
+  # Flatpak bundle of the companion with the gateway inside, built with
+  # flatpak-builder in the Flathub CI image for its runtime (GNOME 51).
+  flatpak:
+    name: Flatpak ${{ matrix.arch }}
+    needs: distros
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-51
+      options: --privileged
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64, fp_arch: x86_64, runner: ubuntu-24.04 }
+          - { arch: arm64, fp_arch: aarch64, runner: ubuntu-24.04-arm }
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: tree-${{ matrix.arch }}
+          path: ${{ runner.temp }}
+
+      - name: Unpack the installed trees
+        id: v
+        run: |
+          mkdir -p packaging/flatpak/tree
+          tar -xJf "$RUNNER_TEMP/tree.tar.xz" -C packaging/flatpak/tree
+          echo "version=$(grep '^version:' integrations/desktop/pubspec.yaml | awk '{print $2}' | cut -d+ -f1)" >> "$GITHUB_OUTPUT"
+
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          manifest-path: packaging/flatpak/com.dhivalabs.prism.desktop.yml
+          bundle: dl-prism-desktop-${{ steps.v.outputs.version }}-${{ matrix.fp_arch }}.flatpak
+          artifact-name: flatpak-${{ matrix.arch }}
+          arch: ${{ matrix.fp_arch }}
+          cache: false
+
+  # Installs each bundle on a plain Ubuntu runner the way a user would (the
+  # runtime comes from Flathub) and runs it in the sandbox.
+  flatpak-test:
+    name: Flatpak ${{ matrix.arch }} install and run
+    needs: flatpak
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64, runner: ubuntu-24.04 }
+          - { arch: arm64, runner: ubuntu-24.04-arm }
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: flatpak-${{ matrix.arch }}
+          path: bundle
+
+      - name: Install Flatpak, Xvfb and the smoke-test tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            flatpak xvfb xauth dbus dbus-x11 xdotool imagemagick curl
+          # bubblewrap needs unprivileged user namespaces, which Ubuntu 24.04
+          # restricts through AppArmor.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Install the bundle and run it
+        timeout-minutes: 20
+        run: packaging/flatpak/test-bundle.sh bundle/*.flatpak
+
   release:
     name: Release assets
-    needs: [desktop, gateway]
+    needs: [desktop, gateway, distros, aur, flatpak-test]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -353,10 +561,31 @@ jobs:
           path: assets
           merge-multiple: true
 
+      # The other-distribution packages, the AUR recipes and the Flatpaks.
+      # The distros artifacts keep their dist/<component>/ folders, so they
+      # land apart and the check step moves their files into assets/.
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: distros-*
+          path: distros
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: aur
+          path: assets
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: flatpak-*
+          path: assets
+          merge-multiple: true
+
       - name: Check the release assets
         run: |
           DESKTOP="$(grep '^version:' integrations/desktop/pubspec.yaml | awk '{print $2}' | cut -d+ -f1)"
           GATEWAY="$(sed -n 's/^VERSION ?= *//p' Makefile)"
+          mv distros/gateway/* distros/desktop/* assets/
           ls -l assets
           expected="
           dl-prism-desktop-full-${DESKTOP}-linux-x64.tar.gz
@@ -366,11 +595,25 @@ jobs:
           prism-${GATEWAY}-linux-amd64
           prism-${GATEWAY}-linux-arm64
           prism-${GATEWAY}-windows-amd64.exe
-          prism-${GATEWAY}-windows-arm64.exe"
+          prism-${GATEWAY}-windows-arm64.exe
+          dl-prism-${GATEWAY}-1.x86_64.rpm
+          dl-prism-${GATEWAY}-1.aarch64.rpm
+          dl-prism-${GATEWAY}-1-x86_64.pkg.tar.zst
+          dl-prism-${GATEWAY}-1-aarch64.pkg.tar.zst
+          dl-prism-bin-${GATEWAY}-aur.tar.gz
+          dl-prism-desktop-${DESKTOP}-1.x86_64.rpm
+          dl-prism-desktop-${DESKTOP}-1.aarch64.rpm
+          dl-prism-desktop-${DESKTOP}-1-x86_64.pkg.tar.zst
+          dl-prism-desktop-${DESKTOP}-1-aarch64.pkg.tar.zst
+          dl-prism-desktop-${DESKTOP}-x86_64.AppImage
+          dl-prism-desktop-${DESKTOP}-aarch64.AppImage
+          dl-prism-desktop-${DESKTOP}-x86_64.flatpak
+          dl-prism-desktop-${DESKTOP}-aarch64.flatpak
+          dl-prism-desktop-bin-${DESKTOP}-aur.tar.gz"
           for f in $expected; do
             [ -f "assets/$f" ] || { echo "::error::missing assets/$f"; exit 1; }
           done
-          [ "$(ls assets | wc -l)" -eq 8 ]
+          [ "$(ls assets | wc -l)" -eq 22 ]
           if [ -n "$TAG" ] && [ "$TAG" != "v$GATEWAY" ]; then
             echo "::warning::release tag $TAG differs from the gateway version $GATEWAY in the Makefile; asset names carry $GATEWAY"
           fi

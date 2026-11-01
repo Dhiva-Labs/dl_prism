@@ -1,0 +1,47 @@
+# Flatpak manifest for DL Prism Desktop, with the prism gateway it starts.
+#
+# Like the .rpm, Arch package and AppImage, this repackages what the Builds
+# workflow compiled and tested: the desktop companion's engine bundle and
+# the gateway binary, laid out by packaging/linux-distros/make-tree.sh and
+# unpacked into packaging/flatpak/tree/ by the workflow. A Flathub
+# submission needs `tree` swapped for source builds; see README.md in this
+# directory.
+id: com.dhivalabs.prism.desktop
+runtime: org.gnome.Platform
+runtime-version: '51'
+sdk: org.gnome.Sdk
+command: dl-prism-desktop
+finish-args:
+  # GTK needs a display socket; fallback-x11 covers X11-only desktops.
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  # GPU acceleration for Flutter's renderer.
+  - --device=dri
+  # The gateway listens on localhost and calls cloud providers; the
+  # companion talks to it and to a local Ollama.
+  - --share=network
+  # The gateway config the companion edits, ~/.config/prism/prism.yaml,
+  # shared with a prism installed on the host.
+  - --filesystem=~/.config/prism:create
+modules:
+  - name: dl-prism-desktop
+    buildsystem: simple
+    sources:
+      - type: dir
+        path: tree
+        dest: tree
+      - type: file
+        path: com.dhivalabs.prism.desktop.metainfo.xml
+    build-commands:
+      # Flutter finds lib/ and data/ next to its executable.
+      - install -d /app/lib /app/bin
+      - cp -a tree/usr/lib/dl-prism-desktop /app/lib/dl-prism-desktop
+      - ln -s ../lib/dl-prism-desktop/desktop /app/bin/dl-prism-desktop
+      # The gateway the companion starts (`prism` on PATH), and its example
+      # config.
+      - install -Dm755 tree/usr/bin/prism /app/bin/prism
+      - install -Dm644 tree/usr/share/doc/dl-prism/prism.example.yaml -t /app/share/doc/dl-prism
+      - install -Dm644 tree/usr/share/applications/com.dhivalabs.prism.desktop.desktop -t /app/share/applications
+      - install -Dm644 tree/usr/share/icons/hicolor/192x192/apps/com.dhivalabs.prism.desktop.png -t /app/share/icons/hicolor/192x192/apps
+      - install -Dm644 com.dhivalabs.prism.desktop.metainfo.xml -t /app/share/metainfo

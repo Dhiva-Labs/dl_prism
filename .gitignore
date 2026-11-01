@@ -3,3 +3,4 @@
 /dist/
 prism.yaml
 *.test
+/packaging/flatpak/tree/

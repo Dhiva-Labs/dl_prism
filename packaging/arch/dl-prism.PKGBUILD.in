@@ -1,0 +1,30 @@
+# Maintainer: Dhiva Labs <dhivakar1010@gmail.com>
+#
+# AUR package for the prism gateway. It installs the static binary from the
+# GitHub release (the one every other format ships) plus the docs and
+# licenses from the release tag. packaging/arch/aur.sh renders this file for
+# each release (version and checksums) and checks it with makepkg; the
+# rendered PKGBUILD and .SRCINFO are what gets pushed to the AUR.
+pkgname=dl-prism-bin
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc='@SUMMARY@'
+arch=('x86_64' 'aarch64')
+url='@HOMEPAGE@'
+license=('@LICENSE@')
+provides=('dl-prism')
+conflicts=('dl-prism')
+options=('!strip' '!debug')
+_raw="https://raw.githubusercontent.com/@GITHUB_REPO@/@TAG@"
+source=(@SOURCES@)
+source_x86_64=("prism-$pkgver-x86_64::@RELEASE_URL@/prism-$pkgver-linux-amd64")
+source_aarch64=("prism-$pkgver-aarch64::@RELEASE_URL@/prism-$pkgver-linux-arm64")
+sha256sums=(@SHA256SUMS@)
+sha256sums_x86_64=('@SHA_X64@')
+sha256sums_aarch64=('@SHA_ARM64@')
+
+package() {
+  install -Dm755 "prism-$pkgver-$CARCH" "$pkgdir/usr/bin/prism"
+  install -Dm644 -t "$pkgdir/usr/share/doc/dl-prism" README.md CHANGELOG.md prism.example.yaml
+  install -Dm644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE NOTICE
+}
