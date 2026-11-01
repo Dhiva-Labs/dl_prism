@@ -25,11 +25,14 @@ echo "::group::ldd of every ELF file in /app, in the sandbox"
 flatpak run --command=sh "$app" -c '
   set -eu
   n=0; missing=0
+  # Flutter plugin libraries keep the RUNPATH of the build machine; at run
+  # time the $ORIGIN/lib of the executable finds libflutter_linux_gtk.so.
+  libs=/app/lib/dl-prism-desktop/lib
   for f in /app/bin/prism $(find /app/lib/dl-prism-desktop -type f); do
     [ "$(head -c 4 "$f" | od -An -tx1 | tr -d " \n")" = 7f454c46 ] || continue
     n=$((n + 1))
-    if ldd "$f" 2>&1 | grep "not found" > /dev/null; then
-      echo "missing libraries for $f:"; ldd "$f" | grep "not found"; missing=1
+    if LD_LIBRARY_PATH="$libs" ldd "$f" 2>&1 | grep "not found" > /dev/null; then
+      echo "missing libraries for $f:"; LD_LIBRARY_PATH="$libs" ldd "$f" | grep "not found"; missing=1
     fi
   done
   echo "$n ELF files checked with ldd"
