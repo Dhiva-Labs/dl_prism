@@ -84,7 +84,12 @@ for f in "${elfs[@]}"; do
       NEEDED) needed["$value"]=1 ;;
     esac
   done < <(objdump -p "$f" | awk '$1 == "SONAME" || $1 == "NEEDED" { print $1, $2 }')
-  v="$(objdump -T "$f" 2> /dev/null | grep -o 'GLIBC_[0-9][0-9.]*' | sort -uV | tail -n 1)"
+  # Flutter's libapp.so (and any static binary) imports nothing from glibc:
+  # awk, unlike grep, does not fail on no match under pipefail.
+  v=
+  if objdump -p "$f" | grep '^Dynamic Section:' > /dev/null; then
+    v="$(objdump -T "$f" | awk 'match($0, /GLIBC_[0-9][0-9.]*/) { print substr($0, RSTART, RLENGTH) }' | sort -uV | tail -n 1)"
+  fi
   if [ -n "$v" ]; then
     glibc_max="$(printf '%s\n%s\n' "$glibc_max" "$v" | sed '/^$/d' | sort -V | tail -n 1)"
   fi

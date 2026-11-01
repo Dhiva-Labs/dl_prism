@@ -15,9 +15,9 @@ case "$MODE" in
     ;;
   rpm-suse)
     zypper -n -q --gpg-auto-import-keys refresh
-    # xvfb-run needs awk, and dbus-run-session is not in dbus-1 there.
+    # xvfb-run needs awk, and dbus-run-session is in dbus-1-daemon there.
     zypper -n -q install file findutils which procps gawk \
-      xvfb-run Mesa-dri dbus-1 /usr/bin/dbus-run-session \
+      xvfb-run Mesa-dri dbus-1 dbus-1-daemon \
       "${SMOKE_DEPS_ZYPPER[@]}"
     ;;
   pacman)
@@ -66,7 +66,7 @@ done)
 libdirs="$(for f in "${elfs[@]}"; do case "$f" in *.so|*.so.*) dirname "$f" ;; esac; done | sort -u | paste -sd:)"
 missing=0
 for f in "${elfs[@]}"; do
-  if LD_LIBRARY_PATH="$libdirs" ldd "$f" 2>&1 | grep -q 'not found'; then
+  if LD_LIBRARY_PATH="$libdirs" ldd "$f" 2>&1 | grep 'not found' > /dev/null; then
     echo "missing libraries for $f:"
     LD_LIBRARY_PATH="$libdirs" ldd "$f" | grep 'not found'
     missing=1

@@ -28,7 +28,7 @@ flatpak run --command=sh "$app" -c '
   for f in /app/bin/prism $(find /app/lib/dl-prism-desktop -type f); do
     [ "$(head -c 4 "$f" | od -An -tx1 | tr -d " \n")" = 7f454c46 ] || continue
     n=$((n + 1))
-    if ldd "$f" 2>&1 | grep -q "not found"; then
+    if ldd "$f" 2>&1 | grep "not found" > /dev/null; then
       echo "missing libraries for $f:"; ldd "$f" | grep "not found"; missing=1
     fi
   done
