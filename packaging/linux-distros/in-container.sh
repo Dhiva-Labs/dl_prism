@@ -21,6 +21,10 @@ case "$MODE" in
       "${SMOKE_DEPS_ZYPPER[@]}"
     ;;
   pacman)
+    # The archlinux image skips /usr/share/doc (and man, locale) on install
+    # to stay small; a real Arch system does not, and the gateway smoke reads
+    # the example config the package installs there.
+    sed -i '/^NoExtract/d' /etc/pacman.conf
     pacman -Syu --noconfirm --needed -q file findutils which procps-ng \
       xorg-server-xvfb xorg-xauth mesa dbus "${SMOKE_DEPS_PACMAN[@]}"
     ;;
