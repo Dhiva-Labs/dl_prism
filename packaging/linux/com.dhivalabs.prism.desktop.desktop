@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=DL Prism Desktop
+GenericName=AI Gateway Control
+Comment=Start, watch and configure the DL Prism AI gateway
+Exec=dl-prism-desktop
+Icon=com.dhivalabs.prism.desktop
+Terminal=false
+Categories=Development;
+Keywords=ai;llm;gateway;openai;ollama;prism;
+StartupWMClass=com.dhivalabs.prism.desktop

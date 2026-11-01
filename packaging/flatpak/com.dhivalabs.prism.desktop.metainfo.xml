@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.dhivalabs.prism.desktop</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+  <name>DL Prism Desktop</name>
+  <summary>Desktop control tower for the DL Prism gateway</summary>
+  <description>
+    <p>
+      DL Prism is a local-first AI gateway: one OpenAI-compatible endpoint in
+      front of every model you use, cloud or local, with manual and automatic
+      routing, policy rules, failover and budget-aware cost tracking.
+    </p>
+    <p>
+      This app starts and stops the gateway (included), shows its health,
+      spend against budget and providers, connects cloud providers and
+      manages local Ollama models. The dashboard opens in your browser.
+    </p>
+  </description>
+  <launchable type="desktop-id">com.dhivalabs.prism.desktop.desktop</launchable>
+  <url type="homepage">https://github.com/Dhiva-Labs/dl_prism</url>
+  <url type="bugtracker">https://github.com/Dhiva-Labs/dl_prism/issues</url>
+  <developer id="com.dhivalabs">
+    <name>Dhiva Labs</name>
+  </developer>
+  <content_rating type="oars-1.1"/>
+</component>
