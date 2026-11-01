@@ -562,10 +562,12 @@ jobs:
           merge-multiple: true
 
       # The other-distribution packages, the AUR recipes and the Flatpaks.
+      # The distros artifacts keep their dist/<component>/ folders, so they
+      # land apart and the check step moves their files into assets/.
       - uses: actions/download-artifact@v8
         with:
           pattern: distros-*
-          path: assets
+          path: distros
           merge-multiple: true
 
       - uses: actions/download-artifact@v8
@@ -583,6 +585,7 @@ jobs:
         run: |
           DESKTOP="$(grep '^version:' integrations/desktop/pubspec.yaml | awk '{print $2}' | cut -d+ -f1)"
           GATEWAY="$(sed -n 's/^VERSION ?= *//p' Makefile)"
+          mv distros/gateway/* distros/desktop/* assets/
           ls -l assets
           expected="
           dl-prism-desktop-full-${DESKTOP}-linux-x64.tar.gz
