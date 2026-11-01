@@ -5,6 +5,7 @@
 ![Gateway: Linux x64 | arm64](https://img.shields.io/badge/Gateway%20Linux-x64%20%7C%20arm64-informational?logo=linux&logoColor=white)
 ![Gateway: Windows x64 | arm64](https://img.shields.io/badge/Gateway%20Windows-x64%20%7C%20arm64-informational?logo=windows&logoColor=white)
 ![Desktop companion: Linux x64 | arm64](https://img.shields.io/badge/Desktop%20companion%20Linux-x64%20%7C%20arm64-informational?logo=linux&logoColor=white)
+![Linux: tar.gz | rpm | Arch | AppImage | Flatpak](https://img.shields.io/badge/Linux-tar.gz%20%7C%20rpm%20%7C%20Arch%20%7C%20AppImage%20%7C%20Flatpak-informational?logo=linux&logoColor=white)
 
 <p align="center">
   <img src="docs/design/spectral-discipline-plate-i.png" alt="PLATE I — one beam dispersed into a labeled spectrum of AI providers" width="560">
@@ -48,6 +49,28 @@ tar -xzf dl-prism-desktop-engine-<version>-linux-arm64.tar.gz
 
 The desktop tarballs are built on Ubuntu 24.04, so they need that release's GTK 3 and C library or
 newer. The companion is Linux-only; there is no Windows build of it.
+
+### Fedora, openSUSE, Arch, AppImage and Flatpak
+
+Releases also carry packages for other distributions, repackaged from the
+same binaries and installed and run on each distribution by CI (from the
+next release on). The gateway is `dl-prism` (the `prism` command); the
+desktop companion is `dl-prism-desktop`, the engine variant (the dashboard
+opens in your browser), and depends on `dl-prism`. `<arch>` is `x86_64` or
+`aarch64`.
+
+| Distribution | Files | Install |
+|---|---|---|
+| Fedora, RHEL/Rocky/Alma 10 | `dl-prism-<version>-1.<arch>.rpm`, `dl-prism-desktop-<desktop version>-1.<arch>.rpm` | `sudo dnf install ./dl-prism-*.rpm` |
+| openSUSE Tumbleweed | the same `.rpm` files (unsigned) | `sudo zypper install --allow-unsigned-rpm ./dl-prism-*.rpm` |
+| Arch Linux | `dl-prism-<version>-1-<arch>.pkg.tar.zst`, `dl-prism-desktop-<desktop version>-1-<arch>.pkg.tar.zst` | `sudo pacman -U ./dl-prism-*.pkg.tar.zst` (AUR `dl-prism-bin` and `dl-prism-desktop-bin` once published) |
+| Any distribution (AppImage) | `dl-prism-desktop-<desktop version>-<arch>.AppImage` | `chmod +x` and run; the gateway is inside |
+| Any distribution (Flatpak) | `dl-prism-desktop-<desktop version>-<arch>.flatpak` | `flatpak install --user ./dl-prism-desktop-*.flatpak`, then `flatpak run com.dhivalabs.prism.desktop`; the gateway is inside, the runtime comes from Flathub |
+
+A server needs only `dl-prism`. The desktop packages and the AppImage need
+glibc 2.39 and GTK 3 (Fedora 40 or newer, current Tumbleweed and Arch); see
+[packaging/flatpak/README.md](packaging/flatpak/README.md) for the
+Flatpak's permissions.
 
 ## Quick start
 
