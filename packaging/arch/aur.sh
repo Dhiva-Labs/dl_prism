@@ -63,7 +63,11 @@ render desktop "$DESKTOP_VERSION" "$dt_x64" "$dt_arm64" \
   LICENSE=LICENSE NOTICE=NOTICE
 cp "$dt_x64" "$work/desktop/dl-prism-desktop-$DESKTOP_VERSION-x86_64.tar.gz"
 
-docker run --rm -v "$work:/build" archlinux:latest bash -euo pipefail -c '
+# The container hands /build to its builder user; the trap gives it back to
+# the runner's user, or the tar below and the cleanup cannot read it.
+docker run --rm -v "$work:/build" -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+  archlinux:latest bash -euo pipefail -c '
+  trap "chown -R $HOST_UID:$HOST_GID /build" EXIT
   pacman -Syu --noconfirm --needed -q base-devel namcap
   useradd -m builder
   chown -R builder /build
