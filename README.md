@@ -26,10 +26,41 @@ Windsurf, Continue, Codex CLI, and anything else with a configurable
 `base_url` can use it unchanged — set the base URL to
 `http://127.0.0.1:8130/v1` and pick a model (or `auto`).
 
+## Engineering highlights
+
+- **Policy routing.** Each request is classified by heuristics (task kind, language, image parts, estimated tokens; no LLM call) and walked through ordered rules, first match wins. Startup validates the config, and `pipeline:<name>` returns an explicit "not implemented" error. [internal/router/engine.go](internal/router/engine.go), [classify.go](internal/router/classify.go), [policy.go](internal/router/policy.go).
+- **Failover with a circuit breaker.** Per-model fallback chains retry on connection errors, 408, 429 and 5xx, and never after a stream has started writing. Three consecutive failures open a provider's breaker for 30 s, which moves it to the end of the chain instead of removing it. [breaker.go](internal/router/breaker.go) (mutex-guarded, tested in [breaker_test.go](internal/router/breaker_test.go)), chain building in [engine.go](internal/router/engine.go), retry loop in [internal/server/server.go](internal/server/server.go).
+- **Cost ledger.** An append-only JSONL file whose entries hold timestamp, provider, model, token counts and cost, with no prompt or response fields at all. The current-month total drives the `budget_exceeded` routing condition. When an upstream reports no usage, the prompt side is estimated and the entry is flagged `estimated`. [internal/cost/ledger.go](internal/cost/ledger.go), [ledger_test.go](internal/cost/ledger_test.go).
+- **MCP server.** `prism mcp` speaks MCP over stdio and exposes `prism_chat`, `prism_explain`, `prism_models` and `prism_usage`, calling the running gateway over HTTP so routing, breaker and ledger state stay in one process. [internal/mcp](internal/mcp).
+- **Approval-gated agent tools.** The workbench agent can list/read/write files, run shell commands and fetch URLs. Writes and shell calls park the run until you approve (modes `always`, `mutations` (default), `never`), with a timeout, a step cap and one run per chat. File tools resolve every path, including through symlinks, and refuse anything outside the project workspace. [agent.go](internal/workbench/agent.go), [tools.go](internal/workbench/tools.go), [agent_test.go](internal/workbench/agent_test.go), [tools_test.go](internal/workbench/tools_test.go).
+- **Provider translation.** The Anthropic adapter translates OpenAI-shaped requests and streams, covered by table tests ([anthropic_test.go](internal/provider/anthropic_test.go)); `/v1/messages` translates the other way ([messages.go](internal/server/messages.go)).
+
+## Status and limits
+
+- **No release has been published yet.** The version in the source is 0.2.0 (`Makefile`, `cmd/prism/main.go`), but there is no git tag and no GitHub release, so there are no downloadable binaries or packages today. Build from source (below). CI builds the Linux and Windows gateway and the Linux desktop companion on every push to `main` ([builds.yml](.github/workflows/builds.yml)); they are attached to a release only when one is published.
+- Pre-1.0 and unaudited. Routing classification is heuristic only.
+- Not implemented: hybrid pipelines, tool-call translation in the `anthropic` adapter and in `/v1/messages`.
+- The agent's shell tool is not an OS sandbox: it runs `bash -c` with the workspace as the working directory, a scrubbed environment, a timeout and an output cap, behind the approval gate. It can reach whatever your user can. Keep approvals on, or use a throwaway user or container, for anything untrusted.
+
 ## Install
 
-Release assets, built in CI on a native runner of each architecture
-(`.github/workflows/builds.yml`):
+### Build from source
+
+Needs Go (the version in [go.mod](go.mod)). The dashboard is committed in `ui/dist`, so Node is only needed to rebuild it (`make ui`).
+
+```bash
+git clone https://github.com/Dhiva-Labs/dl_prism && cd dl_prism
+make build                         # bin/prism, or: go build ./cmd/prism
+./bin/prism version
+make test                          # go test -race ./...
+```
+
+Then follow [Quick start](#quick-start). The desktop companion (Flutter, Linux) is built from `integrations/desktop`; see [builds.yml](.github/workflows/builds.yml) for the exact steps CI uses.
+
+### Release assets (once a release is published)
+
+CI builds these on a native runner of each architecture
+(`.github/workflows/builds.yml`); none are published yet:
 
 | Asset | What it is |
 |---|---|
@@ -53,8 +84,8 @@ newer. The companion is Linux-only; there is no Windows build of it.
 ### Fedora, openSUSE, Arch, AppImage and Flatpak
 
 Releases also carry packages for other distributions, repackaged from the
-same binaries and installed and run on each distribution by CI (from the
-next release on). The gateway is `dl-prism` (the `prism` command); the
+same binaries and installed and run on each distribution by CI once a
+release is published. The gateway is `dl-prism` (the `prism` command); the
 desktop companion is `dl-prism-desktop`, the engine variant (the dashboard
 opens in your browser), and depends on `dl-prism`. `<arch>` is `x86_64` or
 `aarch64`.
@@ -157,7 +188,8 @@ prism mcp     [--gateway url] [--api-key key]   # MCP server over stdio
 The dashboard's **Projects** section keeps conversations, attached
 knowledge, and an agent together per project. The agent can act — list,
 read, and write files, run shell commands, fetch the web — inside a
-per-project sandboxed `workspace/` it cannot escape. Agency is **off**
+per-project `workspace/` directory (file tools are confined to it; the shell
+tool is not an OS sandbox, see Status and limits). Agency is **off**
 until you enable it in project settings; writes and shell commands wait
 for your explicit approval by default, and every tool call is shown as
 it happens. Agent turns route through the normal chain, so policies,
@@ -270,9 +302,9 @@ in [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md#use-your-subscription-as-a-provid
 - [docs/COMPANIONS_PLAN.md](docs/COMPANIONS_PLAN.md) — the companion-surface plan
 - [docs/SPEC_REVIEW.md](docs/SPEC_REVIEW.md) — engineering review of the spec
 
-## Status
+## Roadmap
 
-v0.2.0 — M0–M3 of the plan plus the companion surfaces:
+Source version 0.2.0 (unreleased) — M0–M3 of the plan plus the companion surfaces:
 
 - **Routing**: manual + automatic modes, policy engine, failover with circuit
   breaker, cost ledger and budget condition, CLI.
@@ -284,7 +316,7 @@ v0.2.0 — M0–M3 of the plan plus the companion surfaces:
 
 Planned next (M4): hybrid pipelines (`pipeline:<name>`), tool-call
 translation for the anthropic adapter, config import/export, hardware-aware
-routing, load-balancing weights, Flutter desktop shell.
+routing, load-balancing weights.
 
 ## Sponsors
 
