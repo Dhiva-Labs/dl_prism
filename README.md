@@ -37,7 +37,7 @@ Windsurf, Continue, Codex CLI, and anything else with a configurable
 
 ## Status and limits
 
-- **No release has been published yet.** The version in the source is 0.2.0 (`Makefile`, `cmd/prism/main.go`), but there is no git tag and no GitHub release, so there are no downloadable binaries or packages today. Build from source (below). CI builds the Linux and Windows gateway and the Linux desktop companion on every push to `main` ([builds.yml](.github/workflows/builds.yml)); they are attached to a release only when one is published.
+- **v0.2.0 is the first release.** Binaries and packages come from [builds.yml](.github/workflows/builds.yml), which attaches them to the [release](https://github.com/Dhiva-Labs/dl_prism/releases/tag/v0.2.0) when its build finishes. You can also build from source (below).
 - Pre-1.0 and unaudited. Routing classification is heuristic only.
 - Not implemented: hybrid pipelines, tool-call translation in the `anthropic` adapter and in `/v1/messages`.
 - The agent's shell tool is not an OS sandbox: it runs `bash -c` with the workspace as the working directory, a scrubbed environment, a timeout and an output cap, behind the approval gate. It can reach whatever your user can. Keep approvals on, or use a throwaway user or container, for anything untrusted.
@@ -57,10 +57,10 @@ make test                          # go test -race ./...
 
 Then follow [Quick start](#quick-start). The desktop companion (Flutter, Linux) is built from `integrations/desktop`; see [builds.yml](.github/workflows/builds.yml) for the exact steps CI uses.
 
-### Release assets (once a release is published)
+### Release assets
 
 CI builds these on a native runner of each architecture
-(`.github/workflows/builds.yml`); none are published yet:
+(`.github/workflows/builds.yml`) and attaches them to each published release:
 
 | Asset | What it is |
 |---|---|
@@ -84,8 +84,7 @@ newer. The companion is Linux-only; there is no Windows build of it.
 ### Fedora, openSUSE, Arch, AppImage and Flatpak
 
 Releases also carry packages for other distributions, repackaged from the
-same binaries and installed and run on each distribution by CI once a
-release is published. The gateway is `dl-prism` (the `prism` command); the
+same binaries and installed and run on each distribution by CI. The gateway is `dl-prism` (the `prism` command); the
 desktop companion is `dl-prism-desktop`, the engine variant (the dashboard
 opens in your browser), and depends on `dl-prism`. `<arch>` is `x86_64` or
 `aarch64`.
@@ -304,7 +303,7 @@ in [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md#use-your-subscription-as-a-provid
 
 ## Roadmap
 
-Source version 0.2.0 (unreleased) — M0–M3 of the plan plus the companion surfaces:
+Version 0.2.0 — M0–M3 of the plan plus the companion surfaces:
 
 - **Routing**: manual + automatic modes, policy engine, failover with circuit
   breaker, cost ledger and budget condition, CLI.
