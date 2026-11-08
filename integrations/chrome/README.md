@@ -1,6 +1,6 @@
 # DL Prism Companion — Chrome & Firefox
 
-A thin browser client for [DL Prism](https://github.com/dhivalabs/dl_prism), the
+A thin browser client for [DL Prism](https://github.com/Dhiva-Labs/dl_prism), the
 local AI-gateway. Every feature here is a REST call to your own running
 gateway (`prism serve`) — the extension carries no routing logic of its own.
 One codebase, two loadable targets: Chrome (Manifest V3 service worker) and
@@ -34,8 +34,16 @@ automatically at install time on Chrome — nothing else to do.
 
 ## Install — Firefox
 
+Needs Firefox 140 or later. The Firefox manifest declares
+`data_collection_permissions: { required: ['websiteContent'] }`: Mozilla
+counts anything that leaves the add-on as transmitted, local servers
+included, and "Ask DL Prism about …" sends the selected text and page title
+to your gateway. Firefox shows this at install. [PRIVACY.md](PRIVACY.md)
+lists everything the extension sends and stores.
+
 Firefox needs the build step, since its manifest differs from Chrome's (see
-below).
+below). `node tool/package.mjs` builds and zips `dist/firefox` for
+addons.mozilla.org; [AMO_LISTING.md](AMO_LISTING.md) has the listing copy.
 
 ```bash
 node tool/build.mjs      # writes dist/chrome/ and dist/firefox/
@@ -73,7 +81,7 @@ with a manifest tailored to that browser:
 | | Chrome | Firefox |
 |---|---|---|
 | Background | `service_worker` | `scripts` (event page) — Firefox does not reliably support MV3 service workers |
-| `browser_specific_settings` | — | `gecko.id` + `gecko.strict_min_version` |
+| `browser_specific_settings` | — | `gecko.id`, `gecko.strict_min_version` (140) and `gecko.data_collection_permissions` |
 | Everything else (`permissions`, `host_permissions`, `action`, `icons`, `options_ui`) | identical | identical |
 
 The repo root (`manifest.json`, `background.js`, etc.) is untouched by the
