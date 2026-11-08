@@ -129,6 +129,34 @@ Exercises `common/api.js` (the exact module the extension loads) against a
 live gateway from plain Node — the same escape hatch used when a real
 browser isn't available to click through the UI by hand.
 
+## Firefox end-to-end test
+
+`test/e2e-firefox.mjs` runs the Firefox build in headless Firefox (WebDriver
+BiDi) against a real `prism serve` and a mock OpenAI-compatible upstream, so
+it needs no AI provider account. It covers the host-access banner, the
+options page's connection test (right and wrong API key), a streamed chat
+with the route and spend lines, the "Ask DL Prism about …" hand-off (the
+selected text and page title reach the gateway), and the background event
+page. A run takes under 10 seconds once the gateway is built.
+
+```bash
+(cd test && npm install)        # first time: puppeteer-core
+node test/e2e-firefox.mjs [--shots DIR]
+```
+
+Env: `FIREFOX` (default: the snap's real binary,
+`/snap/firefox/current/usr/lib/firefox/firefox`), `GO`, `PRISM_BIN`. Ports
+8199 and 8130 must be free.
+
+The same mock is a manual test kit, for addons.mozilla.org reviewers too:
+
+```bash
+node test/mock-upstream.mjs             # terminal 1: mock model on 127.0.0.1:8199
+prism serve -c test/prism.mock.yaml     # terminal 2: gateway on 127.0.0.1:8130
+```
+
+Then set the API key to `mock-gateway-key` in the extension's options.
+
 ## Regenerating icons
 
 ```bash

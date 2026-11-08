@@ -1,0 +1,28 @@
+# prism.mock.yaml: DL Prism gateway config for testing the browser extension
+# against the mock upstream (test/mock-upstream.mjs). AMO reviewer test kit.
+#
+#   node test/mock-upstream.mjs            # terminal 1, 127.0.0.1:8199
+#   prism serve -c test/prism.mock.yaml    # terminal 2, 127.0.0.1:8130
+#
+# In the extension settings use the API key below. No real model, no network.
+
+server:
+  listen: 127.0.0.1:8130
+  api_keys: [mock-gateway-key]
+
+providers:
+  - name: mock
+    type: openai
+    base_url: http://127.0.0.1:8199/v1
+    models:
+      - id: mock-chat
+        context_window: 8192
+        capabilities: [code, reasoning]
+        speed: fast
+        cost: {input_per_mtok: 0, output_per_mtok: 0}
+
+routing:
+  default: mock-chat
+
+budget:
+  monthly_usd: 10

@@ -1,0 +1,7 @@
+{
+  "name": "dl-prism-companion-e2e",
+  "private": true,
+  "type": "module",
+  "description": "Throwaway harness deps for e2e-firefox.mjs (the extension itself has no npm deps).",
+  "devDependencies": { "puppeteer-core": "^25.16.0" }
+}
