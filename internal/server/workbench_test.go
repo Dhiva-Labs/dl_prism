@@ -34,6 +34,7 @@ func (f *fixture) req(method, path, body string, headers ...[2]string) *httptest
 		r = strings.NewReader(body)
 	}
 	req := httptest.NewRequest(method, path, r)
+	req.Host = testHost
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -297,6 +298,7 @@ func TestWorkbenchFileUpload(t *testing.T) {
 
 	ct, body := multipartUpload(t, "file", "brief.md", "ship by friday")
 	req := httptest.NewRequest(http.MethodPost, "/admin/projects/"+p.ID+"/files", body)
+	req.Host = testHost
 	req.Header.Set("Content-Type", ct)
 	w := httptest.NewRecorder()
 	f.handler.ServeHTTP(w, req)
@@ -377,6 +379,7 @@ func TestWorkbenchFileUploadLimits(t *testing.T) {
 	mw.WriteField("notfile", "x")
 	mw.Close()
 	req := httptest.NewRequest(http.MethodPost, "/admin/projects/"+p.ID+"/files", &buf)
+	req.Host = testHost
 	req.Header.Set("Content-Type", mw.FormDataContentType())
 	w := httptest.NewRecorder()
 	f.handler.ServeHTTP(w, req)
@@ -387,6 +390,7 @@ func TestWorkbenchFileUploadLimits(t *testing.T) {
 	// Past the 10 MB cap.
 	ct, body := multipartUpload(t, "file", "huge.bin", strings.Repeat("x", (10<<20)+1024))
 	req = httptest.NewRequest(http.MethodPost, "/admin/projects/"+p.ID+"/files", body)
+	req.Host = testHost
 	req.Header.Set("Content-Type", ct)
 	w = httptest.NewRecorder()
 	f.handler.ServeHTTP(w, req)

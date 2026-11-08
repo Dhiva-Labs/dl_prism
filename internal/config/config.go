@@ -172,6 +172,11 @@ func Parse(raw []byte) (*Config, error) {
 	return &cfg, nil
 }
 
+// Validate re-checks the invariants Parse enforces. Anything that mutates a
+// parsed Config, such as `prism serve --listen`, must call it again: the
+// api_keys requirement is keyed on the listen address.
+func (c *Config) Validate() error { return c.validate() }
+
 func (c *Config) validate() error {
 	if len(c.Providers) == 0 {
 		return fmt.Errorf("config: at least one provider is required")

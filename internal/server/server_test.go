@@ -150,6 +150,11 @@ type fixture struct {
 	anthro  *upstream
 }
 
+// testHost stands in for the loopback address a real client connects to;
+// httptest.NewRequest's default of example.com reads as DNS rebinding to
+// the browser guard.
+const testHost = "127.0.0.1:8130"
+
 func newFixture(t *testing.T, tweak ...func(*config.Config)) *fixture {
 	t.Helper()
 	f := &fixture{t: t, primary: newUpstream(t), backup: newUpstream(t), anthro: newUpstream(t)}
@@ -183,6 +188,7 @@ func newFixture(t *testing.T, tweak ...func(*config.Config)) *fixture {
 func (f *fixture) post(path, body string, headers ...[2]string) *httptest.ResponseRecorder {
 	f.t.Helper()
 	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	req.Host = testHost
 	req.Header.Set("Content-Type", "application/json")
 	for _, h := range headers {
 		req.Header.Set(h[0], h[1])
@@ -195,6 +201,7 @@ func (f *fixture) post(path, body string, headers ...[2]string) *httptest.Respon
 func (f *fixture) get(path string, headers ...[2]string) *httptest.ResponseRecorder {
 	f.t.Helper()
 	req := httptest.NewRequest(http.MethodGet, path, nil)
+	req.Host = testHost
 	for _, h := range headers {
 		req.Header.Set(h[0], h[1])
 	}
@@ -1027,7 +1034,9 @@ func TestUsageEndpointWithoutLedger(t *testing.T) {
 	f := newFixture(t)
 	srv := New(f.cfg, f.reg, f.engine, nil)
 	w := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/admin/usage", nil))
+	usageReq := httptest.NewRequest(http.MethodGet, "/admin/usage", nil)
+	usageReq.Host = testHost
+	srv.Handler().ServeHTTP(w, usageReq)
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200 (body %s)", w.Code, w.Body.String())
 	}
@@ -1040,6 +1049,7 @@ func TestChatWithoutLedgerStillServes(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions",
 		strings.NewReader(`{"model":"gpt-test","messages":[{"role":"user","content":"hi"}]}`))
+	req.Host = testHost
 	w := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(w, req)
 	if w.Code != http.StatusOK {

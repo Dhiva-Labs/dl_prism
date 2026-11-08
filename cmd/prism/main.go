@@ -140,6 +140,12 @@ func cmdServe(args []string) error {
 	}
 	if *listen != "" {
 		cfg.Server.Listen = *listen
+		// Parse validated the file's own listen address; the override must
+		// meet the same rule, or `--listen 0.0.0.0:8130` with an empty
+		// api_keys would hand a keyless gateway to the whole network.
+		if err := cfg.Validate(); err != nil {
+			return err
+		}
 	}
 	srv := server.New(cfg, reg, engine, ledger)
 	srv.Version = version

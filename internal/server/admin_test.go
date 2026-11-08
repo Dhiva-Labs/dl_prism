@@ -228,6 +228,7 @@ func TestAdminUsageDailyWithoutLedgerIsEmptyNotNull(t *testing.T) {
 	f := newFixture(t)
 	srv := New(f.cfg, f.reg, f.engine, nil)
 	req := httptest.NewRequest(http.MethodGet, "/admin/usage", nil)
+	req.Host = testHost
 	w := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
