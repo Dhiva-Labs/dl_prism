@@ -16,6 +16,8 @@ A local-first AI gateway. One OpenAI-compatible endpoint in front of every
 model you use — cloud or local — with manual and automatic routing, policy
 rules, failover, and budget-aware cost tracking. Single static Go binary.
 
+**Documentation:** step-by-step guides at [learn.dhivalabs.com](https://learn.dhivalabs.com/apps/dl-prism/): [install](https://learn.dhivalabs.com/apps/dl-prism/install) · [beginner guide](https://learn.dhivalabs.com/apps/dl-prism/getting-started) · [troubleshooting](https://learn.dhivalabs.com/apps/dl-prism/faq). New to the topic? Try the [AI and local models](https://learn.dhivalabs.com/tracks/ai/) learning track.
+
 ```
 any OpenAI-compatible tool ──► prism ──► Anthropic / OpenAI / DeepSeek /
         (base_url swap)                  Ollama / vLLM / LM Studio / ...
