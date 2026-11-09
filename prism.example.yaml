@@ -4,7 +4,14 @@
 server:
   listen: 127.0.0.1:8130
   # Bearer tokens clients must send. Required if you listen beyond loopback.
+  # Without keys the gateway only answers its own web UI and non-browser
+  # clients on this machine; web pages and browser extensions are refused.
   api_keys: []
+  # Browser origins allowed to call a keyless gateway, exactly as the
+  # browser sends them, e.g. "chrome-extension://<your extension id>".
+  # The simpler route for the browser extension is to set an api key above
+  # and paste it into the extension's options.
+  # allowed_origins: []
 
 providers:
   - name: anthropic

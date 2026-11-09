@@ -233,7 +233,15 @@ Four adapter types cover effectively everything:
 
 API keys are referenced via `api_key_env` (or `${VAR}` in `api_key`) and
 never appear in logs or API responses. The server refuses to listen beyond
-loopback unless client `api_keys` are configured.
+loopback unless client `api_keys` are configured, including when the address
+is changed with `--listen`.
+
+Without `api_keys` the gateway serves only its own web UI and non-browser
+clients on the same machine. Requests from any other browser origin (a web
+page you visit, a browser extension) or carrying a foreign `Host` header are
+refused, so a page cannot reach the agent or spend your provider budget
+through your browser. Give browser extensions an API key, or list their
+origin under `server.allowed_origins`.
 
 ### Your subscription as a provider
 

@@ -22,16 +22,29 @@ import (
 // gateway never answers), so the checks step aside and deployments behind a
 // reverse proxy keep working with whatever Host and Origin the proxy sends.
 //
-// Browser extensions pass: a page cannot forge an extension origin, and an
-// extension only reaches the gateway with host permissions the user granted
-// at install.
+// Browser extensions get no blanket pass. Any installed extension, with no
+// host permission at all, can send the same no-preflight POST a web page
+// can, so trusting every chrome-extension:// origin would leave the shell
+// tool one malicious add-on away. An extension either presents an API key
+// or has its exact origin listed in server.allowed_origins.
 func (s *Server) guard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if len(s.cfg.Server.APIKeys) == 0 {
-			if origin := r.Header.Get("Origin"); origin != "" && !originAllowed(origin, r.Host) {
+			origin := r.Header.Get("Origin")
+			if origin != "" && !s.originAllowed(origin, r.Host) {
 				writeErr(w, http.StatusForbidden,
-					"cross-origin requests are not accepted; configure server.api_keys for remote clients", "forbidden")
+					"cross-origin requests are not accepted by a keyless gateway: set server.api_keys and give the client a key, or list this origin under server.allowed_origins", "forbidden")
 				return
+			}
+			// Belt and braces for a state-changing request that arrives
+			// without an Origin header: browsers still label where it came
+			// from. Reads are left alone so links into the UI keep working.
+			if origin == "" && !safeMethod(r.Method) {
+				if site := r.Header.Get("Sec-Fetch-Site"); site == "cross-site" || site == "same-site" {
+					writeErr(w, http.StatusForbidden,
+						"cross-site requests are not accepted by a keyless gateway", "forbidden")
+					return
+				}
 			}
 			if !s.hostAllowed(r.Host) {
 				writeErr(w, http.StatusForbidden,
@@ -43,19 +56,26 @@ func (s *Server) guard(next http.Handler) http.Handler {
 	})
 }
 
+func safeMethod(m string) bool {
+	return m == http.MethodGet || m == http.MethodHead || m == http.MethodOptions
+}
+
 // originAllowed reports whether a request carrying Origin may proceed: the
-// gateway's own origin (the served UI) or a browser extension. An opaque
-// "null" origin, which sandboxed frames and some redirects produce, is not
-// parseable as a host and is refused.
-func originAllowed(origin, host string) bool {
+// gateway's own origin (the served UI), or one the operator listed in
+// server.allowed_origins. An opaque "null" origin, which sandboxed frames
+// and some redirects produce, matches neither and is refused.
+func (s *Server) originAllowed(origin, host string) bool {
+	trimmed := strings.TrimSuffix(origin, "/")
+	for _, allowed := range s.cfg.Server.AllowedOrigins {
+		if allowed != "" && strings.EqualFold(strings.TrimSuffix(allowed, "/"), trimmed) {
+			return true
+		}
+	}
 	u, err := url.Parse(origin)
 	if err != nil || u.Host == "" {
 		return false
 	}
-	switch u.Scheme {
-	case "chrome-extension", "moz-extension", "safari-web-extension":
-		return true
-	case "http", "https":
+	if u.Scheme == "http" || u.Scheme == "https" {
 		return strings.EqualFold(u.Host, host)
 	}
 	return false

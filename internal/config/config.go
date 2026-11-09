@@ -27,6 +27,12 @@ type Server struct {
 	// APIKeys, when non-empty, are bearer tokens clients must present.
 	// Required when Listen is not a loopback address.
 	APIKeys []string `yaml:"api_keys"`
+	// AllowedOrigins lists extra browser origins that may call a keyless
+	// gateway, written exactly as the browser sends them, for example
+	// "chrome-extension://<id>". Without api_keys only the gateway's own
+	// UI is accepted; a browser extension must either use a key or be
+	// named here. Ignored once api_keys are set.
+	AllowedOrigins []string `yaml:"allowed_origins"`
 }
 
 // Provider types. The first two speak HTTP to a remote endpoint and need a

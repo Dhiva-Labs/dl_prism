@@ -62,12 +62,78 @@ func TestGuardRefusesCrossSiteRequestsWithoutKeys(t *testing.T) {
 	})
 }
 
-func TestGuardAllowsOwnOriginAndExtensions(t *testing.T) {
+// Any installed extension can send a no-preflight POST without a single
+// host permission, so an extension origin is not trusted for being one.
+func TestGuardRefusesUnlistedExtensions(t *testing.T) {
+	const chromeExt = "chrome-extension://abcdefghijklmnopabcdefghijklmnop"
+	const firefoxExt = "moz-extension://0c2d3a6e-9d4b-4a0f-8e6b-1f2a3b4c5d6e"
+
+	for _, origin := range []string{chromeExt, firefoxExt, "safari-web-extension://ABCDEF"} {
+		t.Run("unlisted "+origin, func(t *testing.T) {
+			f := newFixture(t)
+			w := send(f, http.MethodPost, "/admin/projects", testHost,
+				`{"name":"x","settings":{"agent_enabled":true,"approval_mode":"never"}}`,
+				[2]string{"Origin", origin})
+			if w.Code != http.StatusForbidden {
+				t.Errorf("status = %d, want 403 (body %s)", w.Code, w.Body.String())
+			}
+		})
+	}
+
+	t.Run("listed in allowed_origins", func(t *testing.T) {
+		f := newFixture(t, func(cfg *config.Config) {
+			cfg.Server.AllowedOrigins = []string{chromeExt + "/"}
+		})
+		if w := send(f, http.MethodGet, "/v1/models", testHost, "", [2]string{"Origin", chromeExt}); w.Code != http.StatusOK {
+			t.Errorf("listed origin: status = %d, want 200 (body %s)", w.Code, w.Body.String())
+		}
+		if w := send(f, http.MethodGet, "/v1/models", testHost, "", [2]string{"Origin", firefoxExt}); w.Code != http.StatusForbidden {
+			t.Errorf("a different extension: status = %d, want 403", w.Code)
+		}
+	})
+
+	t.Run("with an API key the extension is authenticated instead", func(t *testing.T) {
+		f := newFixture(t, func(cfg *config.Config) { cfg.Server.APIKeys = []string{"sk-prism-test"} })
+		w := send(f, http.MethodGet, "/v1/models", testHost, "",
+			[2]string{"Origin", chromeExt}, [2]string{"Authorization", "Bearer sk-prism-test"})
+		if w.Code != http.StatusOK {
+			t.Errorf("status = %d, want 200 (body %s)", w.Code, w.Body.String())
+		}
+	})
+}
+
+// A state-changing request with no Origin header is still refused when the
+// browser labels it as coming from another site.
+func TestGuardUsesFetchMetadataWhenOriginIsAbsent(t *testing.T) {
+	for _, site := range []string{"cross-site", "same-site"} {
+		t.Run(site, func(t *testing.T) {
+			f := newFixture(t)
+			w := send(f, http.MethodPost, "/v1/chat/completions", testHost, chatBody, [2]string{"Sec-Fetch-Site", site})
+			if w.Code != http.StatusForbidden {
+				t.Errorf("status = %d, want 403 (body %s)", w.Code, w.Body.String())
+			}
+			if f.primary.Hits()+f.backup.Hits() != 0 {
+				t.Error("a cross-site request reached an upstream")
+			}
+		})
+	}
+	t.Run("reads and same-origin writes are unaffected", func(t *testing.T) {
+		f := newFixture(t)
+		if w := send(f, http.MethodGet, "/v1/models", testHost, "", [2]string{"Sec-Fetch-Site", "cross-site"}); w.Code != http.StatusOK {
+			t.Errorf("cross-site GET: status = %d, want 200", w.Code)
+		}
+		if w := send(f, http.MethodPost, "/v1/route/explain", testHost,
+			`{"model":"auto","messages":[{"role":"user","content":"hi"}]}`,
+			[2]string{"Sec-Fetch-Site", "same-origin"}); w.Code == http.StatusForbidden {
+			t.Errorf("same-origin POST was refused: %s", w.Body.String())
+		}
+	})
+}
+
+func TestGuardAllowsOwnOrigin(t *testing.T) {
 	for _, origin := range []string{
 		"http://127.0.0.1:8130",
 		"HTTP://127.0.0.1:8130",
-		"chrome-extension://abcdefghijklmnopabcdefghijklmnop",
-		"moz-extension://0c2d3a6e-9d4b-4a0f-8e6b-1f2a3b4c5d6e",
 	} {
 		t.Run(origin, func(t *testing.T) {
 			f := newFixture(t)

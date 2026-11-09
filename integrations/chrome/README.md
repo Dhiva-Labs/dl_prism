@@ -27,7 +27,16 @@ No build step required; the repo root itself is a loadable extension.
    equivalent, `dist/chrome/manifest.json` is a byte-for-byte copy of the one
    at the repo root.
 4. Open the extension's *Options* and set the gateway URL (default
-   `http://127.0.0.1:8130`) and API key, if you configured one.
+   `http://127.0.0.1:8130`) and an API key.
+
+   The gateway needs one of two things before it answers a browser
+   extension: an entry in `server.api_keys` that you paste here, or this
+   extension's origin (`chrome-extension://<id>`, or the `moz-extension://`
+   address on Firefox) listed under `server.allowed_origins`. A gateway
+   with neither refuses extensions with HTTP 403, because any installed
+   extension could otherwise drive the agent's shell tool. The API key is
+   the simpler route, and the only stable one on Firefox, where the
+   extension's address differs per installation.
 
 Host permissions (`http://127.0.0.1/*`, `http://localhost/*`) are granted
 automatically at install time on Chrome — nothing else to do.
