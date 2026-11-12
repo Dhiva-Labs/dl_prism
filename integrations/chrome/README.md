@@ -1,6 +1,6 @@
 # DL Prism Companion — Chrome & Firefox
 
-A thin browser client for [DL Prism](https://github.com/dhivalabs/dl_prism), the
+A thin browser client for [DL Prism](https://github.com/Dhiva-Labs/dl_prism), the
 local AI-gateway. Every feature here is a REST call to your own running
 gateway (`prism serve`) — the extension carries no routing logic of its own.
 One codebase, two loadable targets: Chrome (Manifest V3 service worker) and
@@ -27,15 +27,32 @@ No build step required; the repo root itself is a loadable extension.
    equivalent, `dist/chrome/manifest.json` is a byte-for-byte copy of the one
    at the repo root.
 4. Open the extension's *Options* and set the gateway URL (default
-   `http://127.0.0.1:8130`) and API key, if you configured one.
+   `http://127.0.0.1:8130`) and an API key.
+
+   The gateway needs one of two things before it answers a browser
+   extension: an entry in `server.api_keys` that you paste here, or this
+   extension's origin (`chrome-extension://<id>`, or the `moz-extension://`
+   address on Firefox) listed under `server.allowed_origins`. A gateway
+   with neither refuses extensions with HTTP 403, because any installed
+   extension could otherwise drive the agent's shell tool. The API key is
+   the simpler route, and the only stable one on Firefox, where the
+   extension's address differs per installation.
 
 Host permissions (`http://127.0.0.1/*`, `http://localhost/*`) are granted
 automatically at install time on Chrome — nothing else to do.
 
 ## Install — Firefox
 
+Needs Firefox 140 or later. The Firefox manifest declares
+`data_collection_permissions: { required: ['websiteContent'] }`: Mozilla
+counts anything that leaves the add-on as transmitted, local servers
+included, and "Ask DL Prism about …" sends the selected text and page title
+to your gateway. Firefox shows this at install. [PRIVACY.md](PRIVACY.md)
+lists everything the extension sends and stores.
+
 Firefox needs the build step, since its manifest differs from Chrome's (see
-below).
+below). `node tool/package.mjs` builds and zips `dist/firefox` for
+addons.mozilla.org; [AMO_LISTING.md](AMO_LISTING.md) has the listing copy.
 
 ```bash
 node tool/build.mjs      # writes dist/chrome/ and dist/firefox/
@@ -73,7 +90,7 @@ with a manifest tailored to that browser:
 | | Chrome | Firefox |
 |---|---|---|
 | Background | `service_worker` | `scripts` (event page) — Firefox does not reliably support MV3 service workers |
-| `browser_specific_settings` | — | `gecko.id` + `gecko.strict_min_version` |
+| `browser_specific_settings` | — | `gecko.id`, `gecko.strict_min_version` (140) and `gecko.data_collection_permissions` |
 | Everything else (`permissions`, `host_permissions`, `action`, `icons`, `options_ui`) | identical | identical |
 
 The repo root (`manifest.json`, `background.js`, etc.) is untouched by the
@@ -120,6 +137,34 @@ node smoke/smoke.mjs [baseUrl] [apiKey]   # defaults to http://127.0.0.1:8130
 Exercises `common/api.js` (the exact module the extension loads) against a
 live gateway from plain Node — the same escape hatch used when a real
 browser isn't available to click through the UI by hand.
+
+## Firefox end-to-end test
+
+`test/e2e-firefox.mjs` runs the Firefox build in headless Firefox (WebDriver
+BiDi) against a real `prism serve` and a mock OpenAI-compatible upstream, so
+it needs no AI provider account. It covers the host-access banner, the
+options page's connection test (right and wrong API key), a streamed chat
+with the route and spend lines, the "Ask DL Prism about …" hand-off (the
+selected text and page title reach the gateway), and the background event
+page. A run takes under 10 seconds once the gateway is built.
+
+```bash
+(cd test && npm install)        # first time: puppeteer-core
+node test/e2e-firefox.mjs [--shots DIR]
+```
+
+Env: `FIREFOX` (default: the snap's real binary,
+`/snap/firefox/current/usr/lib/firefox/firefox`), `GO`, `PRISM_BIN`. Ports
+8199 and 8130 must be free.
+
+The same mock is a manual test kit, for addons.mozilla.org reviewers too:
+
+```bash
+node test/mock-upstream.mjs             # terminal 1: mock model on 127.0.0.1:8199
+prism serve -c test/prism.mock.yaml     # terminal 2: gateway on 127.0.0.1:8130
+```
+
+Then set the API key to `mock-gateway-key` in the extension's options.
 
 ## Regenerating icons
 

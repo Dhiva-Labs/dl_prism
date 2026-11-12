@@ -419,3 +419,25 @@ unknown_top_level_field: true
 		t.Errorf("Parse() error = %v, want it to mention the field was not found", err)
 	}
 }
+
+// `prism serve --listen` changes the address after Parse; the api_keys rule
+// must be re-applied or a keyless gateway lands on the network.
+func TestValidateAfterListenOverride(t *testing.T) {
+	cfg, err := Parse([]byte(fullExampleYAML))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Server.Listen = "0.0.0.0:8130"
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "server.api_keys is required") {
+		t.Fatalf("Validate() after moving a keyless gateway off loopback = %v, want api_keys error", err)
+	}
+	cfg.Server.Listen = "127.0.0.1:9000"
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() on loopback override = %v, want nil", err)
+	}
+	cfg.Server.Listen = "0.0.0.0:8130"
+	cfg.Server.APIKeys = []string{"sk-x"}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() with keys = %v, want nil", err)
+	}
+}

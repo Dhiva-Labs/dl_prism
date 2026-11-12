@@ -84,14 +84,14 @@ function buildFirefox(baseManifest) {
   manifest.browser_specific_settings = {
     gecko: {
       id: 'dl-prism@dhivalabs.dev',
-      strict_min_version: '121.0',
-      // NOTE: `web-ext lint` warns MISSING_DATA_COLLECTION_PERMISSIONS
-      // without a browser_specific_settings.gecko.data_collection_permissions
-      // key (AMO policy — the extension collects none, only talking to the
-      // user's own local gateway). That key requires strict_min_version
-      // 140.0+ though, which conflicts with the 121.0 floor asked for here;
-      // add `data_collection_permissions: { required: ['none'] }` once the
-      // min-version floor is deliberately raised to 140+.
+      // 140 is the first Firefox with built-in data collection consent,
+      // which addons.mozilla.org requires of new add-ons.
+      strict_min_version: '140.0',
+      // Mozilla counts anything that leaves the add-on as transmitted, local
+      // servers included. "Ask DL Prism about ..." sends the selected text
+      // and the page title to the user's gateway: website content. Chat
+      // messages the user types are theirs to send and fit no category.
+      data_collection_permissions: { required: ['websiteContent'] },
     },
   };
 
